@@ -18,6 +18,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import org.json.JSONObject;
+import org.json.JSONArray;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -91,13 +92,13 @@ public class TeamConsoleActivity extends Activity {
         settings.setOnClickListener(v -> showTokenDialog(true));
         root.addView(header);
 
-        TextView note = text("ثلاثة مراجعين يعملون بالتوازي • مجاني فقط • لا تعديل تلقائي على ملفات المصدر", 12, muted, false);
+        TextView note = text("ثلاثة أدوار مراجعة تعمل بالتوازي عبر OmniRoute • وضع مجاني صارم • لا تعديل تلقائي للمصدر", 12, muted, false);
         root.addView(note, new LinearLayout.LayoutParams(-1, dp(42)));
 
         status = text("جارٍ فحص اتصال Termux...", 12, muted, false);
         root.addView(status, new LinearLayout.LayoutParams(-1, dp(42)));
         Button diagnostics = new Button(this);
-        diagnostics.setText("فحص اتصال GitHub والنموذج المجاني");
+        diagnostics.setText("فحص GitHub وOmniRoute والنماذج المتاحة");
         diagnostics.setAllCaps(false);
         root.addView(diagnostics, new LinearLayout.LayoutParams(-1, dp(46)));
         diagnostics.setOnClickListener(v -> refreshStatus());
@@ -212,22 +213,25 @@ public class TeamConsoleActivity extends Activity {
             final String failure = error;
             main.post(() -> {
                 if (data != null && data.optBoolean("ready")) {
-                    status.setText("● GitHub متصل وOpenRouter يقبل المفتاح • مجاني فقط");
+                    status.setText("● GitHub وOmniRoute متصلان • تأكيد وضع Strict المجاني");
                     status.setTextColor(Color.rgb(113, 214, 164));
-                    output.setText("فحص الاتصالات ناجح.\nGitHub: متصل • " + data.optString("github_repo") +
-                        "\nOpenRouter: المفتاح صالح" +
-                        "\nFree tier: " + (data.has("is_free_tier") ? data.optString("is_free_tier") : "لم يحدد المزود نوع الخطة") +
-                        "\nالاستخدام: " + (data.has("usage") ? data.optString("usage") : "غير متاح") +
-                        "\nالحد: " + (data.has("limit") ? data.optString("limit") : "غير متاح") +
-                        "\nلا يوجد تحويل مدفوع في 313.");
+                    output.setText("فحص الاتصال ناجح.\nGitHub: متصل • " + data.optString("github_repo") +
+                        "\nOmniRoute: متصل على الهاتف" +
+                        "\nالنماذج الظاهرة: " + data.optInt("models_visible") +
+                        "\nنماذج عينة: " + data.optJSONArray("model_sample") +
+                        "\nStrict free-access: أكّد المستخدم تفعيله في OmniRoute" +
+                        "\nاختبار إجابة فعلية: لم يُنفّذ بعد (يُختبر عند تشغيل المراجعة)" +
+                        "\nإذا لم يتوفر مسار مجاني صارم، تتوقف المهمة دون بديل مدفوع.");
                 } else if (data != null) {
                     status.setText("○ فشل فحص مزود واحد أو أكثر. افتح التفاصيل بالأسفل.");
                     status.setTextColor(Color.rgb(235, 170, 115));
                     output.setText("نتيجة التشخيص:\nGitHub: " +
                         (data.optBoolean("github_ok") ? "متصل" : data.optString("github_error", "فشل")) +
-                        "\nOpenRouter: " + (data.optBoolean("openrouter_ok") ? "المفتاح صالح" :
-                        data.optString("openrouter_error", "فشل")) +
-                        "\nلا يتم استخدام أي مسار مدفوع.");
+                        "\nOmniRoute: " + (data.optBoolean("omniroute_ok") ? "متصل" :
+                        data.optString("omniroute_error", "فشل")) +
+                        "\nالنماذج الظاهرة: " + data.optInt("models_visible") +
+                        "\nتأكيد Strict المجاني: " + (data.optBoolean("free_only_gate_confirmed") ? "مؤكد" : "غير مؤكد — تم إيقاف الطلبات") +
+                        "\nلا يتم تشغيل أي طلب ذكاء اصطناعي ما لم يتأكد وضع Strict.");
                 } else {
                     status.setText("○ لم يتصل: " + (failure == null ? "خدمة Termux غير جاهزة" : failure));
                     status.setTextColor(Color.rgb(235, 170, 115));
@@ -246,7 +250,7 @@ public class TeamConsoleActivity extends Activity {
         busy = true;
         run.setEnabled(false);
         run.setText("الفريق يعمل...");
-        output.setText("يقرأ 313 ملفات المشروع من GitHub، ثم يرسل مراجعات مستقلة بالتوازي. قد يستغرق ذلك بعض الوقت.");
+        output.setText("يقرأ 313 ملفات المشروع من GitHub، ثم يشغّل ثلاثة أدوار مراجعة بالتوازي عبر OmniRoute. سيُعرض اسم المزوّد والنموذج الفعلي لكل رد.");
         worker.execute(() -> {
             JSONObject result = null;
             String error = null;
@@ -269,9 +273,27 @@ public class TeamConsoleActivity extends Activity {
                     return;
                 }
                 String summary = data.optString("summary", "لا يوجد ملخص.");
+                StringBuilder providers = new StringBuilder();
+                JSONObject report = data.optJSONObject("report");
+                JSONArray agents = report == null ? null : report.optJSONArray("agents");
+                if (agents != null) {
+                    for (int i = 0; i < agents.length(); i++) {
+                        JSONObject agent = agents.optJSONObject(i);
+                        if (agent == null) continue;
+                        providers.append("\\n• ").append(agent.optString("role", "مراجع"));
+                        if (agent.optBoolean("ok")) {
+                            providers.append(": ").append(agent.optString("provider", "المزوّد غير معلن"))
+                                .append(" / ").append(agent.optString("model", "النموذج غير معلن"));
+                            if (agent.has("cost_usd")) providers.append(" • $").append(agent.optString("cost_usd"));
+                        } else {
+                            providers.append(": فشل • ").append(agent.optString("error", "غير معروف"));
+                        }
+                    }
+                }
                 output.setText("اكتملت المراجعة\n"
                     + "المستودع: " + data.optString("repo") + "\n"
-                    + "المساعدون: " + data.optInt("agents_succeeded") + "/" + data.optInt("agents_total") + "\n"
+                    + "أدوار المراجعة الناجحة: " + data.optInt("agents_succeeded") + "/" + data.optInt("agents_total") + "\n"
+                    + "المزوّدون والنماذج الفعلية:" + providers.toString() + "\n"
                     + "فرع المراجعة: " + data.optString("review_branch") + "\n"
                     + "التقرير: " + data.optString("report_path") + "\n\n"
                     + summary + "\n\nتم حفظ التقرير والذاكرة في GitHub. لم يتم تعديل ملفات المصدر أو دمج أي فرع.");
