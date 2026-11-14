@@ -27,8 +27,6 @@ import android.widget.Toast;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -118,8 +116,7 @@ public class MainActivity extends Activity {
         TextView modelLabel = label("النموذج", 12, muted, true);
         modelRow.addView(modelLabel, lp(dp(62), dp(42)));
         modelPicker = new Spinner(this);
-        List<String> names = new ArrayList<>();
-        for (RuncrateFreeModels.Model m : RuncrateFreeModels.all()) names.add(m.name);
+        String[] names = new String[]{"OpenRouter Free Router • تلقائي"};
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_item, names);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -216,16 +213,16 @@ public class MainActivity extends Activity {
 
     private boolean hasKey() {
         try {
-            String key = SecureCredentialStore.readRuncrateKey(this);
-            return key != null && !key.trim().isEmpty();
+            String token = TeamGatewayStore.read(this);
+            return token != null && !token.trim().isEmpty();
         } catch (Exception e) { return false; }
     }
 
     private void refreshConnectionStatus() {
         boolean configured = hasKey();
         connectionStatus.setText(configured
-                ? "● مفتاح Runcrate محفوظ بأمان على الجهاز"
-                : "○ اربط مفتاح Runcrate المجاني من ⚙ لبدء المحادثة");
+                ? "● رمز ربط Termux محفوظ • المحادثة عبر الموجّه المجاني"
+                : "○ اربط 313 بخدمة Termux من ⚙ لبدء المحادثة");
         connectionStatus.setTextColor(configured ? Color.rgb(113, 214, 164) : muted);
 
     }
@@ -234,16 +231,16 @@ public class MainActivity extends Activity {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(20), dp(8), dp(20), dp(4));
-        TextView explain = label("أدخل مفتاح Runcrate API مرة واحدة. سيُحفظ مشفّراً داخل الجهاز ولا يُرسل إلى GitHub.", 13, muted, false);
+        TextView explain = label("الصق رمز الربط الذي طبعته خدمة 313 في Termux. مفتاح OpenRouter يبقى داخل Termux ولا يوضع في التطبيق.", 13, muted, false);
         box.addView(explain, lp(-1, -2));
         EditText keyInput = new EditText(this);
         keyInput.setSingleLine(true);
         keyInput.setTextSize(14);
-        keyInput.setHint("Runcrate API key");
+        keyInput.setHint("313 Gateway token");
         keyInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         box.addView(keyInput, withMargins(-1, dp(52), 0, dp(10), 0, 0));
         AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("إعداد الاتصال داخل 313")
+                .setTitle("ربط 313 مع Termux")
                 .setView(box)
                 .setPositiveButton("حفظ", null)
                 .setNegativeButton(allowSkip ? "إلغاء" : "لاحقاً", (d, w) -> { })
@@ -251,27 +248,20 @@ public class MainActivity extends Activity {
         dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             String value = keyInput.getText().toString().trim();
             if (value.isEmpty()) {
-                keyInput.setError("أدخل المفتاح أولاً");
+                keyInput.setError("أدخل رمز الربط أولاً");
                 return;
             }
             try {
-                SecureCredentialStore.saveRuncrateKey(this, value);
+                TeamGatewayStore.save(this, value);
                 keyInput.setText("");
                 dialog.dismiss();
                 refreshConnectionStatus();
-                Toast.makeText(this, "تم حفظ المفتاح بأمان", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "تم حفظ رمز الربط بأمان", Toast.LENGTH_SHORT).show();
             } catch (Exception e) {
-                Toast.makeText(this, "تعذر حفظ المفتاح على هذا الجهاز", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "تعذر حفظ رمز الربط", Toast.LENGTH_LONG).show();
             }
         }));
         dialog.show();
-    }
-
-    private String selectedModelId() {
-        int index = modelPicker.getSelectedItemPosition();
-        List<RuncrateFreeModels.Model> models = RuncrateFreeModels.all();
-        if (index < 0 || index >= models.size()) return RuncrateFreeModels.GPT_OSS_120B;
-        return models.get(index).id;
     }
 
     private void sendMessage() {
@@ -280,10 +270,9 @@ public class MainActivity extends Activity {
         if (prompt.isEmpty()) return;
         if (!hasKey()) {
             showKeyDialog(false);
-            Toast.makeText(this, "أضف مفتاح Runcrate المجاني أولاً", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "اربط 313 مع Termux أولاً", Toast.LENGTH_SHORT).show();
             return;
         }
-
         composer.setText("");
         addBubble(prompt, true);
         try {
@@ -294,37 +283,32 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) { }
 
         sending = true;
-        addBubble("جاري التفكير...", false);
-        final String modelId = selectedModelId();
+        addBubble("جاري الاتصال بالموجّه المجاني...", false);
         final JSONArray requestHistory = copyArray(history);
         worker.execute(() -> {
-            RuncrateApi.ChatResult result = null;
-            String localFailure = null;
+            String answer = null;
+            String failure = null;
             try {
-                String key = SecureCredentialStore.readRuncrateKey(this);
-                result = RuncrateApi.chat(key, modelId, requestHistory);
+                String token = TeamGatewayStore.read(this);
+                answer = TermuxGatewayApi.chat(token, requestHistory);
             } catch (Exception e) {
-                localFailure = describeLocalFailure(e);
+                failure = describeLocalFailure(e);
             }
-            final RuncrateApi.ChatResult response = result;
-            final String failure = localFailure;
+            final String response = answer;
+            final String error = failure;
             mainHandler.post(() -> {
                 sending = false;
                 if (messagesBox.getChildCount() > 0) messagesBox.removeViewAt(messagesBox.getChildCount() - 1);
-                if (response != null && response.success) {
-                    addBubble(response.text, false);
+                if (response != null) {
+                    addBubble(response, false);
                     try {
                         JSONObject assistant = new JSONObject();
                         assistant.put("role", "assistant");
-                        assistant.put("content", response.text);
+                        assistant.put("content", response);
                         history.put(assistant);
                     } catch (Exception ignored) { }
-                } else if (response != null && RuncrateFreeModels.isFreeLimitError(response.errorCode)) {
-                    addBubble("الحصة المجانية غير متاحة حالياً أو الضغط مرتفع. لم يتم استخدام أي نموذج مدفوع. جرّب لاحقاً أو اختر نموذجاً مجانياً آخر.", false);
-                } else if (response != null) {
-                    addBubble(describeProviderFailure(response), false);
                 } else {
-                    addBubble(failure == null ? "تعذر تحديد سبب فشل الاتصال." : failure, false);
+                    addBubble(error == null ? "تعذر تحديد سبب فشل الاتصال." : error, false);
                 }
             });
         });
@@ -333,28 +317,24 @@ public class MainActivity extends Activity {
     }
 
     private String describeLocalFailure(Exception error) {
-        String type = error.getClass().getSimpleName();
-        if (type.contains("UnknownHost")) return "تعذر الوصول إلى خادم Runcrate. تحقق من الإنترنت أو DNS.";
-        if (type.contains("SocketTimeout")) return "انتهت مهلة الاتصال بخادم Runcrate. حاول مرة أخرى لاحقاً.";
-        if (type.contains("SSL") || type.contains("Certificate")) return "فشل الاتصال الآمن بخادم Runcrate. تحقق من التاريخ والوقت وتحديث النظام.";
-        if (type.contains("AEADBadTag") || type.contains("UnrecoverableKey")) return "تعذر فك تشفير المفتاح المحفوظ. احذف المفتاح وأعد إدخاله من الإعدادات.";
-        if (error instanceof IllegalArgumentException) return "إعداد الطلب غير صالح: " + safeDetail(error.getMessage());
-        return "فشل الاتصال (" + type + "): " + safeDetail(error.getMessage());
-    }
-
-    private String describeProviderFailure(RuncrateApi.ChatResult result) {
-        int status = result.httpStatus;
-        if (status == 401 || status == 403) return "رفض Runcrate المفتاح أو صلاحية الوصول (HTTP " + status + "). تأكد من المفتاح وأنه تابع لحساب GitHub المؤهل للمجاني.";
-        if (status == 404) return "لم يتعرف Runcrate على النموذج أو المسار (HTTP 404). النموذج المختار: " + selectedModelId();
-        if (status == 429) return "وصل الطلب إلى حد مؤقت لدى Runcrate (HTTP 429). انتظر قليلاً ثم أعد المحاولة.";
-        if (status >= 500) return "حدث عطل لدى خادم Runcrate (HTTP " + status + "). حاول لاحقاً.";
-        return "رفض Runcrate الطلب (HTTP " + status + ", " + safeDetail(result.errorCode) + "): " + safeDetail(result.errorMessage);
+        String message = error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
+        String lower = message.toLowerCase();
+        if (lower.contains("failed to connect") || lower.contains("connection refused"))
+            return "خدمة 313 غير شغالة في Termux. افتح Termux وشغّل خادم 313 أولاً.";
+        if (lower.contains("unauthorized") || lower.contains("http 401"))
+            return "رمز الربط غير صحيح. افتح إعداد فريق المشاريع وأعد حفظ الرمز الذي ظهر في Termux.";
+        if (lower.contains("openrouter") || lower.contains("http 402") || lower.contains("http 403")
+                || lower.contains("http 429") || lower.contains("quota") || lower.contains("rate limit"))
+            return "المزوّد المجاني رفض الطلب أو وصل إلى حد الاستخدام: " + safeDetail(message);
+        if (error instanceof java.net.SocketTimeoutException)
+            return "انتهت مهلة انتظار النموذج المجاني. حاول مرة أخرى بعد قليل.";
+        return "تعذر تنفيذ الطلب: " + safeDetail(message);
     }
 
     private String safeDetail(String value) {
         if (value == null || value.trim().isEmpty()) return "لا توجد تفاصيل إضافية";
-        String safe = value.replaceAll("(?i)rc_live_[A-Za-z0-9_-]+", "[hidden]");
-        return safe.length() > 240 ? safe.substring(0, 240) : safe;
+        String safe = value.replaceAll("(?i)(sk-or-v1-|gh[pousr]_|github_pat_)[A-Za-z0-9_-]+", "[hidden]");
+        return safe.length() > 400 ? safe.substring(0, 400) : safe;
     }
 
     private JSONArray copyArray(JSONArray source) {
