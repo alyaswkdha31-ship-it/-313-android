@@ -192,6 +192,16 @@ def provider_diagnostics(config):
         result["models_visible"] = len(models)
         result["model_completion_tested"] = False
         result["model_sample"] = [str(x.get("id", "")) for x in models[:12] if isinstance(x, dict)]
+        model_ids = [str(x.get("id", "")) for x in models if isinstance(x, dict)]
+        lower_ids = [model_id.lower() for model_id in model_ids]
+        result["provider_models_visible"] = {
+            "gemini": [model_ids[i] for i, value in enumerate(lower_ids)
+                if value.startswith(("gemini/", "google/"))][:8],
+            "claude": [model_ids[i] for i, value in enumerate(lower_ids)
+                if value.startswith(("anthropic/", "claude/", "cc/claude"))][:8],
+            "deepseek": [model_ids[i] for i, value in enumerate(lower_ids)
+                if value.startswith(("deepseek/", "deepseek-"))][:8]
+        }
     except Exception as exc:
         result["omniroute_error"] = redact_secrets(str(exc))[:240]
     result["ready"] = (result["github_ok"] and result["omniroute_ok"]
@@ -398,7 +408,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/health":
-            self.send_json(200, {"ok": True, "service": "313-termux-team", "version": "0.2.0"})
+            self.send_json(200, {"ok": True, "service": "313-termux-team", "version": "0.3.0"})
             return
         if self.path in ("/api/status", "/api/diagnostics"):
             if not self.authorized():
