@@ -22,6 +22,20 @@ class GatewayPolicyTests(unittest.TestCase):
         source = MODULE.read_text(encoding="utf-8")
         self.assertIn('"paid_fallback": False', source)
 
+    def test_main_chat_uses_only_free_router(self):
+        source = MODULE.read_text(encoding="utf-8")
+        self.assertIn('if self.path not in ("/api/team/review", "/api/chat")', source)
+        self.assertIn('"model": "openrouter/free"', source)
+        self.assertIn('def chat_completion(config, messages):', source)
+
+    def test_diagnostics_validate_both_providers(self):
+        source = MODULE.read_text(encoding="utf-8")
+        self.assertIn('OPENROUTER_KEY_URL = "https://openrouter.ai/api/v1/key"', source)
+        self.assertIn('def provider_diagnostics(config):', source)
+        self.assertIn('"/api/diagnostics"', source)
+        self.assertIn('"github_ok"', source)
+        self.assertIn('"openrouter_ok"', source)
+
     def test_secret_paths_are_excluded(self):
         self.assertIsNotNone(gateway.SECRET_NAME.search(".env"))
         self.assertIsNotNone(gateway.SECRET_NAME.search("app/private_key.pem"))
