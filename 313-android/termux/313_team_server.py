@@ -149,7 +149,7 @@ def run_agent(config, role, task, project):
 def github_put(config, repo, branch, path, content, message):
     repo_q = urllib.parse.quote(repo, safe="/")
     path_q = urllib.parse.quote(path, safe="/")
-    url = GITHUB_API + "/repos/" + repo_q + "/contents/" + path_q
+    url = GITHUB_API + "/repos/" + repo_q + "/contents/" + path_q + "?ref=" + urllib.parse.quote(branch, safe="")
     headers = github_headers(config["github_token"])
     headers["Content-Type"] = "application/json"
     existing = None
@@ -217,7 +217,7 @@ def team_review(task, requested_repo=None):
         report["team_summary"] = "تعذر تلخيص تقارير الفريق تلقائياً: " + str(exc)
     report_text = json.dumps(report, ensure_ascii=False, indent=2)
     branch = create_review_branch(config, repo, project["branch"])
-    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d-%H%M%S")
+    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
     report_path = "313-android/AGENT_LOGS/review-" + stamp + ".json"
     commit = github_put(config, repo, branch, report_path, report_text,
         "313: save multi-agent project review")
@@ -232,12 +232,12 @@ def team_review(task, requested_repo=None):
             raise
         old_text = "# 313 Project Memory\n\nPersistent project notes and review history.\n"
     memory_note = ("\n\n## Review " + stamp + " UTC\n"
-        "- Task: " + task.replace("\\n", " ")[:500] + "\\n"
-        "- Source branch: " + project["branch"] + "\\n"
-        "- Review report: " + report_path + "\\n"
-        "- Agents completed: " + str(len(good)) + "/" + str(len(roles)) + "\\n"
-        "- Review branch: " + branch + "\\n"
-        "- Note: this was a read-only review; no source files were modified.\\n")
+        "- Task: " + task.replace("\n", " ")[:500] + "\n"
+        "- Source branch: " + project["branch"] + "\n"
+        "- Review report: " + report_path + "\n"
+        "- Agents completed: " + str(len(good)) + "/" + str(len(roles)) + "\n"
+        "- Review branch: " + branch + "\n"
+        "- Note: this was a read-only review; no source files were modified.\n")
     memory_commit = github_put(config, repo, branch, memory_path, old_text + memory_note,
         "313: update persistent project memory")
     return {"ok": True, "repo": repo, "source_branch": project["branch"],
