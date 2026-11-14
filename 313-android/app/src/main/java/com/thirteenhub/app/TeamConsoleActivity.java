@@ -96,6 +96,11 @@ public class TeamConsoleActivity extends Activity {
 
         status = text("جارٍ فحص اتصال Termux...", 12, muted, false);
         root.addView(status, new LinearLayout.LayoutParams(-1, dp(42)));
+        Button diagnostics = new Button(this);
+        diagnostics.setText("فحص اتصال GitHub والنموذج المجاني");
+        diagnostics.setAllCaps(false);
+        root.addView(diagnostics, new LinearLayout.LayoutParams(-1, dp(46)));
+        diagnostics.setOnClickListener(v -> refreshStatus());
 
         task = new EditText(this);
         task.setTextColor(Color.WHITE);
@@ -201,16 +206,30 @@ public class TeamConsoleActivity extends Activity {
         worker.execute(() -> {
             JSONObject result = null;
             String error = null;
-            try { result = request("/api/status", null); }
+            try { result = request("/api/diagnostics", null); }
             catch (Exception e) { error = e.getMessage(); }
             final JSONObject data = result;
             final String failure = error;
             main.post(() -> {
-                if (data != null && data.optBoolean("configured")) {
-                    status.setText("● متصل • " + data.optString("repo") + " • مجاني فقط");
+                if (data != null && data.optBoolean("ready")) {
+                    status.setText("● GitHub متصل وOpenRouter يقبل المفتاح • مجاني فقط");
                     status.setTextColor(Color.rgb(113, 214, 164));
+                    output.setText("فحص الاتصالات ناجح.\nGitHub: متصل • " + data.optString("github_repo") +
+                        "\nOpenRouter: المفتاح صالح" +
+                        "\nFree tier: " + (data.has("is_free_tier") ? data.optString("is_free_tier") : "لم يحدد المزود نوع الخطة") +
+                        "\nالاستخدام: " + (data.has("usage") ? data.optString("usage") : "غير متاح") +
+                        "\nالحد: " + (data.has("limit") ? data.optString("limit") : "غير متاح") +
+                        "\nلا يوجد تحويل مدفوع في 313.");
+                } else if (data != null) {
+                    status.setText("○ فشل فحص مزود واحد أو أكثر. افتح التفاصيل بالأسفل.");
+                    status.setTextColor(Color.rgb(235, 170, 115));
+                    output.setText("نتيجة التشخيص:\nGitHub: " +
+                        (data.optBoolean("github_ok") ? "متصل" : data.optString("github_error", "فشل")) +
+                        "\nOpenRouter: " + (data.optBoolean("openrouter_ok") ? "المفتاح صالح" :
+                        data.optString("openrouter_error", "فشل")) +
+                        "\nلا يتم استخدام أي مسار مدفوع.");
                 } else {
-                    status.setText("○ لم يتصل: " + (failure == null ? "إعداد Termux غير مكتمل" : failure));
+                    status.setText("○ لم يتصل: " + (failure == null ? "خدمة Termux غير جاهزة" : failure));
                     status.setTextColor(Color.rgb(235, 170, 115));
                 }
             });
