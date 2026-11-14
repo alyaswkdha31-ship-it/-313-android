@@ -5,7 +5,7 @@
 - [x] Add loopback-only Python gateway foundation.
 - [x] Add Android Team Console screen and encrypted gateway-token storage.
 - [x] Add GitHub read-only project review and persistent report/memory branch workflow.
-- [ ] Run CI and fix any Android/Python test failures.
+- [x] Run Python policy tests and Android debug APK CI build successfully (workflow run 43629920804).
 - [ ] Install and test on the user's Android phone with Termux.
 - [ ] Add approved patch proposal and diff review flow.
 - [ ] Add user-approved source-file application on a dedicated branch.
