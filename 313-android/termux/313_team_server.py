@@ -42,6 +42,7 @@ def redact_secrets(value):
     return value
 GITHUB_API = "https://api.github.com"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+OPENROUTER_KEY_URL = "https://openrouter.ai/api/v1/key"
 REVIEW_LOCK = threading.Lock()
 
 
@@ -133,6 +134,55 @@ def read_project(config, repo):
         raise GatewayError("لم أتمكن من قراءة ملفات نصية من المستودع.")
     return {"repo": repo, "branch": branch, "default_branch": default_branch,
         "files": included, "context": "\n".join(chunks)}
+
+
+def openrouter_headers(config):
+    return {"Authorization": "Bearer " + config["openrouter_api_key"],
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://github.com/alyaswkdha31-ship-it/-313-android",
+        "X-Title": "313 Free AI"}
+
+
+def provider_diagnostics(config):
+    result = {"github_ok": False, "openrouter_ok": False,
+        "free_only": True, "paid_fallback": False}
+    try:
+        metadata = github_get(config, "/repos/" + urllib.parse.quote(config["github_repo"], safe="/"))
+        result["github_ok"] = bool(metadata.get("full_name"))
+        result["github_repo"] = metadata.get("full_name", config["github_repo"])
+    except Exception as exc:
+        result["github_error"] = redact_secrets(str(exc))[:240]
+    try:
+        _, key_data = http_json(OPENROUTER_KEY_URL,
+            {"Authorization": "Bearer " + config["openrouter_api_key"],
+             "Accept": "application/json", "User-Agent": "313-Free-AI"}, timeout=15)
+        data = key_data.get("data", key_data)
+        result["openrouter_ok"] = True
+        for field in ("label", "usage", "limit", "is_free_tier", "rate_limit", "free_model_daily_requests"):
+            if field in data:
+                result[field] = data[field]
+    except Exception as exc:
+        result["openrouter_error"] = redact_secrets(str(exc))[:240]
+    result["ready"] = result["github_ok"] and result["openrouter_ok"]
+    return result
+
+
+def chat_completion(config, messages):
+    system = {"role": "system", "content":
+        "You are the assistant inside 313. Be accurate, concise, and helpful. "
+        "Use only free model routing. Never claim tools or actions were used unless they were."}
+    payload_messages = [system] + messages[-20:]
+    body = {"model": "openrouter/free", "temperature": 0.4,
+        "messages": payload_messages}
+    _, result = http_json(OPENROUTER_URL, openrouter_headers(config),
+        body, timeout=120, method="POST")
+    choices = result.get("choices") or []
+    if not choices:
+        raise GatewayError("الموجّه المجاني لم يرجع إجابة.")
+    answer = choices[0].get("message", {}).get("content", "")
+    if not isinstance(answer, str) or not answer.strip():
+        raise GatewayError("وصل رد فارغ من النموذج المجاني.")
+    return answer.strip()
 
 
 def call_openrouter(config, system_prompt, user_prompt):
@@ -303,24 +353,30 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/health":
-            self.send_json(200, {"ok": True, "service": "313-termux-team", "version": "0.1.0"})
+            self.send_json(200, {"ok": True, "service": "313-termux-team", "version": "0.2.0"})
             return
-        if self.path == "/api/status":
+        if self.path in ("/api/status", "/api/diagnostics"):
             if not self.authorized():
                 self.send_json(401, {"ok": False, "error": "unauthorized"})
                 return
             try:
                 config = load_config()
-                self.send_json(200, {"ok": True, "configured": True,
-                    "repo": config["github_repo"], "provider": "OpenRouter Free Models Router",
-                    "free_only": True, "paid_fallback": False})
+                if self.path == "/api/diagnostics":
+                    result = provider_diagnostics(config)
+                    result["repo"] = config["github_repo"]
+                    self.send_json(200, result)
+                else:
+                    self.send_json(200, {"ok": True, "configured": True,
+                        "repo": config["github_repo"], "provider": "OpenRouter Free Models Router",
+                        "free_only": True, "paid_fallback": False,
+                        "note": "Use /api/diagnostics to verify provider credentials."})
             except Exception as exc:
-                self.send_json(200, {"ok": False, "configured": False, "message": str(exc)})
+                self.send_json(200, {"ok": False, "configured": False, "message": redact_secrets(str(exc))[:240]})
             return
         self.send_json(404, {"error": "not_found"})
 
     def do_POST(self):
-        if self.path != "/api/team/review":
+        if self.path not in ("/api/team/review", "/api/chat"):
             self.send_json(404, {"error": "not_found"})
             return
         if not self.authorized():
@@ -331,6 +387,23 @@ class Handler(BaseHTTPRequestHandler):
             if length <= 0 or length > MAX_BODY:
                 raise GatewayError("حجم الطلب غير صالح.")
             body = json.loads(self.rfile.read(length).decode("utf-8"))
+            config = load_config()
+            if self.path == "/api/chat":
+                messages = body.get("messages")
+                if not isinstance(messages, list) or not messages or len(messages) > 40:
+                    raise GatewayError("سجل المحادثة غير صالح.")
+                clean = []
+                for item in messages:
+                    if not isinstance(item, dict) or item.get("role") not in ("user", "assistant"):
+                        raise GatewayError("رسالة المحادثة غير صالحة.")
+                    content = item.get("content")
+                    if not isinstance(content, str) or not content.strip() or len(content) > 12000:
+                        raise GatewayError("محتوى الرسالة غير صالح.")
+                    clean.append({"role": item["role"], "content": content})
+                answer = chat_completion(config, clean)
+                self.send_json(200, {"ok": True, "answer": answer,
+                    "provider": "OpenRouter Free Router", "paid_fallback": False})
+                return
             task = str(body.get("task", "")).strip()
             if not task or len(task) > 4000:
                 raise GatewayError("اكتب مهمة من 1 إلى 4000 حرف.")
@@ -338,7 +411,8 @@ class Handler(BaseHTTPRequestHandler):
                 result = team_review(task, body.get("repo"))
             self.send_json(200, result)
         except Exception as exc:
-            self.send_json(400, {"ok": False, "error": str(exc), "paid_fallback": False})
+            self.send_json(400, {"ok": False, "error": redact_secrets(str(exc))[:700],
+                "paid_fallback": False})
 
     def do_PUT(self):
         self.send_json(405, {"error": "method_not_allowed"})
