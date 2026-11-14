@@ -77,3 +77,26 @@ The repository name is locked to the repository configured during setup. A reque
 ## Security
 
 The gateway binds only to loopback, never `0.0.0.0`. It does not log request bodies or authorization headers. Do not expose port 3131 or OmniRoute's port 20128 through a public tunnel.
+
+## Automatic startup with Termux:Boot
+
+A boot entrypoint is provided at `boot/00-start-313`. It is idempotent: it checks the authenticated OmniRoute models endpoint and the local 313 health endpoint before starting services, then starts the remote worker only when it is not already running. It does not contain or print credentials and does not enable arbitrary remote shell commands.
+
+After Termux:Boot is installed and has been opened once, install the entrypoint from the existing checkout:
+
+```bash
+mkdir -p ~/.termux/boot
+cp ~/313-source/313-android/termux/boot/00-start-313 ~/.termux/boot/00-start-313
+chmod 700 ~/.termux/boot/00-start-313
+```
+
+If the checkout is in a different directory, adjust only the source path in the `cp` command. The script expects the existing private config, OmniRoute key, and runtime files under `~/313-team/`; it does not rerun setup or ask for credentials.
+
+To test without rebooting:
+
+```bash
+bash ~/.termux/boot/00-start-313
+tail -n 30 ~/313-team/logs/boot.log
+```
+
+Then reboot the phone and check the same log. Set both Termux and Termux:Boot battery usage to Unrestricted / Don't optimize, and do not Force stop either app. The wake lock can increase battery use. Android may still restrict background work depending on device settings.
