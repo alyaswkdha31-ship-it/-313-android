@@ -48,25 +48,31 @@ public final class RuncrateApi {
      */
     public static ChatResult chat(String apiKey, String modelId, String userMessage)
             throws Exception {
+        JSONArray messages = new JSONArray();
+        JSONObject message = new JSONObject();
+        message.put("role", "user");
+        message.put("content", userMessage);
+        messages.put(message);
+        return chat(apiKey, modelId, messages);
+    }
+
+    /** Sends the complete conversation history to the selected free model. */
+    public static ChatResult chat(String apiKey, String modelId, JSONArray conversation)
+            throws Exception {
         if (!RuncrateFreeModels.isAllowed(modelId)) {
             throw new IllegalArgumentException("Model is not in the free-only allowlist.");
         }
         if (apiKey == null || apiKey.trim().isEmpty()) {
             throw new IllegalArgumentException("Runcrate API key is required.");
         }
-        if (userMessage == null || userMessage.trim().isEmpty()) {
-            throw new IllegalArgumentException("Message is empty.");
+        if (conversation == null || conversation.length() == 0) {
+            throw new IllegalArgumentException("Conversation is empty.");
         }
 
         JSONObject body = new JSONObject();
         body.put("model", modelId);
         body.put("stream", false);
-        JSONArray messages = new JSONArray();
-        JSONObject message = new JSONObject();
-        message.put("role", "user");
-        message.put("content", userMessage);
-        messages.put(message);
-        body.put("messages", messages);
+        body.put("messages", conversation);
 
         byte[] payload = body.toString().getBytes(StandardCharsets.UTF_8);
         HttpURLConnection connection = (HttpURLConnection) new URL(CHAT_URL).openConnection();
