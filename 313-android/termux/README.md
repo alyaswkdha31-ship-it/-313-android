@@ -32,7 +32,7 @@ Important:
 
 1. Install or start OmniRoute in Termux. Its local API should listen on `http://127.0.0.1:20128`.
 2. In OmniRoute, create/copy an API key from Dashboard → Endpoints.
-3. Enable `freeAccessPolicy = strict` in OmniRoute before allowing inference.
+3. Enable OmniRoute strict mode before allowing inference. OmniRoute v3.8.53 documents this management setting as `PUT /api/settings` with `{"freeAccessPolicy":"strict","excludeTosAvoid":true}`. The request requires an admin-scoped credential (not an ordinary inference-only endpoint key). Keep that credential local; do not paste it into ChatGPT. See the [official strict zero-cost guide](https://github.com/cheaper-inference/OmniRoute/blob/release/v3.8.53/docs/routing/STRICT_ZERO_COST.md). The `excludeTosAvoid` option also excludes providers OmniRoute flags as unsuitable under their terms.
 4. Clone this branch or update an existing checkout:
    ```bash
    git clone --branch feature/313-real-provider-team https://github.com/alyaswkdha31-ship-it/-313-android.git 313-source
