@@ -94,21 +94,30 @@ public final class RuncrateApi {
             InputStream stream = status >= 200 && status < 300
                     ? connection.getInputStream() : connection.getErrorStream();
             String responseText = readAll(stream);
-            JSONObject response = responseText.isEmpty()
-                    ? new JSONObject() : new JSONObject(responseText);
+            JSONObject response;
+            try {
+                response = responseText.isEmpty() ? new JSONObject() : new JSONObject(responseText);
+            } catch (org.json.JSONException malformed) {
+                String detail = responseText.length() > 240
+                        ? responseText.substring(0, 240) : responseText;
+                return new ChatResult(false, null, "invalid_response",
+                        detail.isEmpty() ? "Runcrate returned a non-JSON response." : detail,
+                        status);
+            }
 
             if (status >= 200 && status < 300) {
                 JSONArray choices = response.optJSONArray("choices");
                 if (choices == null || choices.length() == 0) {
                     return new ChatResult(false, null, "empty_response",
-                            "The provider returned no chat choices.", status);
+                            "Runcrate returned HTTP " + status + " but no chat choices. " + responseText,
+                            status);
                 }
                 JSONObject first = choices.optJSONObject(0);
                 JSONObject reply = first == null ? null : first.optJSONObject("message");
                 String answer = reply == null ? null : reply.optString("content", null);
                 if (answer == null || answer.trim().isEmpty()) {
                     return new ChatResult(false, null, "empty_response",
-                            "The provider returned an empty answer.", status);
+                            "Runcrate returned an empty answer.", status);
                 }
                 return new ChatResult(true, answer, null, null, status);
             }
@@ -116,6 +125,7 @@ public final class RuncrateApi {
             JSONObject error = response.optJSONObject("error");
             String code = error == null ? null : error.optString("code", null);
             String detail = error == null ? null : error.optString("message", null);
+            if (error == null && response.has("message")) detail = response.optString("message", null);
             if (RuncrateFreeModels.isFreeLimitError(code)) {
                 return new ChatResult(false, null, code,
                         "Free Runcrate allowance unavailable. No paid fallback was attempted.",
