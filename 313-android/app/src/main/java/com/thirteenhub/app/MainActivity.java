@@ -130,6 +130,10 @@ public class MainActivity extends Activity {
         connectionStatus = label("", 11, muted, false);
         root.addView(connectionStatus, withMargins(-1, -2, dp(4), 0, dp(4), dp(6)));
 
+        Button teamButton = button("فريق المشاريع", true);
+        teamButton.setOnClickListener(v -> startActivity(new Intent(this, TeamConsoleActivity.class)));
+        root.addView(teamButton, withMargins(-1, -2, 0, 0, 0, dp(8)));
+
         chatScroll = new ScrollView(this);
         chatScroll.setFillViewport(true);
         messagesBox = new LinearLayout(this);
@@ -224,9 +228,6 @@ public class MainActivity extends Activity {
                 : "○ اربط مفتاح Runcrate المجاني من ⚙ لبدء المحادثة");
         connectionStatus.setTextColor(configured ? Color.rgb(113, 214, 164) : muted);
 
-        Button teamButton = button("فريق المشاريع", true);
-        teamButton.setOnClickListener(v -> startActivity(new Intent(this, TeamConsoleActivity.class)));
-        root.addView(teamButton, withMargins(-1, -2, 0, dp(8), 0, dp(8)));
     }
 
     private void showKeyDialog(boolean allowSkip) {
