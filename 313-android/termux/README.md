@@ -7,6 +7,8 @@ It uses Python's standard library only and listens on 127.0.0.1:3131.
 
 - Reads the configured GitHub repository directly; no repeated file uploads are needed.
 - Reads text source and project notes from the configured branch while skipping build output, binaries, and likely secret files.
+- Routes the Android main chat through OpenRouter's openrouter/free router via the local Termux gateway.
+- Verifies GitHub and OpenRouter credentials with GET /api/diagnostics before claiming the team is connected.
 - Runs three independent review roles concurrently through OpenRouter's openrouter/free router.
 - Produces a lead summary from the independent reports.
 - Creates a separate 313/team-review-* branch.
@@ -34,7 +36,7 @@ OmniRoute is not auto-enabled yet. Its model catalogue can include paid routes, 
    - An OpenRouter API key from a free account. Do not add credits or enable paid billing.
 5. Start the service with:
    python ~/313-team/313_team_server.py
-6. Open 313 → فريق المشاريع → إعداد, then paste the one-time gateway token printed by setup.
+6. Open 313 → ⚙ or فريق المشاريع → إعداد, then paste the one-time gateway token printed by setup. The same encrypted token is used for the main chat and project team.
 7. Check http://127.0.0.1:3131/health locally.
 
 Credentials are stored only in Termux's private home directory in ~/.config/313/team.json with mode 0600. Never commit this file, paste credentials into ChatGPT, or share it.
@@ -43,6 +45,8 @@ Credentials are stored only in Termux's private home directory in ~/.config/313/
 
 - GET /health: process health.
 - GET /api/status: configuration status (never returns credentials).
+- GET /api/diagnostics: read-only GitHub repository and OpenRouter key validation; does not generate a model completion.
+- POST /api/chat with JSON {"messages":[{"role":"user","content":"Hello"}]}: main chat through openrouter/free only.
 - POST /api/team/review with JSON:
   {"task":"Review project 313 for build and runtime defects"}
 
