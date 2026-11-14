@@ -36,8 +36,43 @@ def put_file(repo, path, branch, token, content, sha, message):
         payload["sha"] = sha
     return request(url, token, payload, "PUT")
 
-def run_fixed(action):
-    if action == "doctor":
+def run_fixed(action, command=None, cfg=None):
+    command = command or {}
+    cfg = cfg or {}
+    if action == "chat":
+        messages = command.get("messages")
+        if not isinstance(messages, list) or not messages or len(messages) > 20:
+            return {"ok": False, "error": "Invalid chat messages; expected 1-20 messages."}
+        clean = []
+        for item in messages:
+            if not isinstance(item, dict) or item.get("role") not in ("user", "assistant"):
+                return {"ok": False, "error": "Invalid chat message role."}
+            content = item.get("content")
+            if not isinstance(content, str) or not content.strip() or len(content) > 12000:
+                return {"ok": False, "error": "Invalid chat message content."}
+            clean.append({"role": item["role"], "content": content})
+        gateway_token = str(cfg.get("gateway_token") or "").strip()
+        if not gateway_token:
+            return {"ok": False, "error": "313 gateway token is not configured."}
+        payload = json.dumps({"messages": clean}).encode("utf-8")
+        req = urllib.request.Request(
+            "http://127.0.0.1:3131/api/chat", data=payload,
+            headers={"Content-Type": "application/json", "X-313-Token": gateway_token},
+            method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=170) as response:
+                data = json.loads(response.read().decode("utf-8"))
+            if not data.get("ok"):
+                return {"ok": False, "error": str(data.get("error", "Chat request failed"))[:500]}
+            return {"ok": True, "answer": str(data.get("answer", ""))[:MAX_OUTPUT],
+                    "provider": data.get("provider", "OmniRoute local gateway"),
+                    "paid_fallback": data.get("paid_fallback", False)}
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode("utf-8", errors="replace")[:500]
+            return {"ok": False, "error": "Gateway HTTP " + str(e.code) + ": " + detail}
+        except Exception as e:
+            return {"ok": False, "error": type(e).__name__ + ": " + str(e)[:300]}
+    elif action == "doctor":
         cmd = ["omniroute", "doctor"]
     elif action == "fix_cli_dependency":
         npm_root = subprocess.check_output(["npm", "root", "-g"], text=True, timeout=15).strip()
@@ -53,7 +88,7 @@ def run_fixed(action):
         return {"ok": False, "error": "Action is not in the allowlist."}
     try:
         p = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
-        output = (p.stdout + "\n" + p.stderr)[-MAX_OUTPUT:]
+        output = (p.stdout + "\\n" + p.stderr)[-MAX_OUTPUT:]
         output = output.replace(str(Path.home()), "~")
         return {"ok": p.returncode == 0, "exit_code": p.returncode, "output": output}
     except Exception as e:
@@ -88,7 +123,7 @@ def main():
     token = cfg.get("github_token")
     if not repo or not branch or not token:
         raise SystemExit("GitHub repo, bridge branch, or token missing in private 313 config.")
-    print("313 remote bridge active. Only allowlisted actions: health, doctor, fix_cli_dependency.")
+    print("313 remote bridge active. Only allowlisted actions: health, doctor, fix_cli_dependency, chat.")
     while True:
         try:
             command, command_sha = get_file(repo, COMMAND_PATH, branch, token)
@@ -97,7 +132,7 @@ def main():
                 action = str(command.get("action", ""))
                 print("Executing approved maintenance action:", action)
                 result = {"id": command_id, "action": action, "completed_at": int(time.time()),
-                          "result": run_fixed(action)}
+                          "result": run_fixed(action, command, cfg)}
                 try:
                     _, result_sha = get_file(repo, RESULT_PATH, branch, token)
                 except Exception:
