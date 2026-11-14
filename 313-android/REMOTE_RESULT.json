@@ -1,5 +1,22 @@
 {
-  "id": "none",
-  "status": "idle",
-  "result": null
+  "id": "313-health-test-1794693991",
+  "action": "health",
+  "completed_at": 1794693997,
+  "result": {
+    "ok": true,
+    "checks": {
+      "313_server_3131": {
+        "reachable": true,
+        "status": 200
+      },
+      "313_server_3132": {
+        "reachable": true,
+        "status": 200
+      },
+      "omniroute_models": {
+        "reachable": true,
+        "models_visible": 3474
+      }
+    }
+  }
 }
