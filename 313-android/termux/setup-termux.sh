@@ -49,7 +49,7 @@ if not os.path.exists(key_path):
 else:
     print("Using the existing local OmniRoute key file.")
 
-confirm = input("Have you enabled Free Access Policy = Strict in OmniRoute? Type YES to allow AI requests: ").strip()
+confirm = input("Have you set freeAccessPolicy=strict and excludeTosAvoid=true in OmniRoute? Type YES to allow AI requests: ").strip()
 strict_confirmed = confirm == "YES"
 
 data.update({
