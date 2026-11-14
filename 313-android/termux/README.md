@@ -32,7 +32,10 @@ OmniRoute is not auto-enabled yet. Its model catalogue can include paid routes, 
 4. During setup, provide:
    - A GitHub fine-grained personal access token restricted to the single repository, with Contents read/write.
    - An OpenRouter API key from a free account. Do not add credits or enable paid billing.
-5. Start the service with: python ~/313-team/313_team_server.py\n6. Open 313 → فريق المشاريع → إعداد, then paste the one-time gateway token printed by setup.\n7. Check http://127.0.0.1:3131/health locally.
+5. Start the service with:
+   python ~/313-team/313_team_server.py
+6. Open 313 → فريق المشاريع → إعداد, then paste the one-time gateway token printed by setup.
+7. Check http://127.0.0.1:3131/health locally.
 
 Credentials are stored only in Termux's private home directory in ~/.config/313/team.json with mode 0600. Never commit this file, paste credentials into ChatGPT, or share it.
 
