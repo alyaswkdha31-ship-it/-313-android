@@ -1,6 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/bash
 set -euo pipefail
-REPO_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 ROOT="$HOME/313-team"
 CONFIG="$HOME/.config/313/team.json"
 mkdir -p "$ROOT"
