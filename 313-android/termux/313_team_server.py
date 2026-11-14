@@ -6,7 +6,7 @@ import datetime as dt
 import json
 import os
 import re
-import threading
+import hmac
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -25,7 +25,7 @@ SAFE_EXTENSIONS = {".java", ".kt", ".py", ".js", ".ts", ".tsx", ".jsx", ".json",
     ".sh", ".sql", ".html", ".css", ".txt"}
 SKIP_PARTS = {".git", ".gradle", ".idea", "build", "dist", "node_modules",
     "vendor", ".venv", "venv", "target", "captures", "outputs", "AGENT_LOGS"}
-SECRET_NAME = re.compile(r"(^|/)(\\.env[^/]*|.*(secret|credential|private.?key).*)$", re.I)
+SECRET_NAME = re.compile(r"(^|/)(\.env[^/]*|.*(secret|credential|private.?key).*)$", re.I)
 GITHUB_API = "https://api.github.com"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -112,11 +112,11 @@ def read_project(config, repo):
         content = content[:min(MAX_FILE_BYTES, remaining)]
         total += len(content)
         included.append(item["path"])
-        chunks.append("\\n===== FILE: " + item["path"] + " =====\\n" + content)
+        chunks.append("\n===== FILE: " + item["path"] + " =====\n" + content)
     if not chunks:
         raise GatewayError("لم أتمكن من قراءة ملفات نصية من المستودع.")
     return {"repo": repo, "branch": branch, "default_branch": default_branch,
-        "files": included, "context": "\\n".join(chunks)}
+        "files": included, "context": "\n".join(chunks)}
 
 
 def call_openrouter(config, system_prompt, user_prompt):
@@ -140,9 +140,9 @@ def run_agent(config, role, task, project):
         "run commands, or tested code. Do not request secrets. Identify uncertainty. "
         "Return concise findings with file paths and actionable steps. "
         "The user requires strictly zero-cost services and no paid fallback.")
-    prompt = ("ROLE: " + role + "\\nTASK: " + task + "\\nREPOSITORY: " + project["repo"] +
-        "\\nBRANCH: " + project["branch"] + "\\nFILES INCLUDED: " +
-        ", ".join(project["files"]) + "\\n\\nPROJECT SOURCE:\\n" + project["context"])
+    prompt = ("ROLE: " + role + "\nTASK: " + task + "\nREPOSITORY: " + project["repo"] +
+        "\nBRANCH: " + project["branch"] + "\nFILES INCLUDED: " +
+        ", ".join(project["files"]) + "\n\nPROJECT SOURCE:\n" + project["context"])
     return call_openrouter(config, system, prompt)
 
 
@@ -168,7 +168,7 @@ def github_put(config, repo, branch, path, content, message):
 
 
 def create_review_branch(config, repo, base_branch):
-    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d-%H%M%S")
+    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
     branch = "313/team-review-" + stamp
     repo_q = urllib.parse.quote(repo, safe="/")
     ref = urllib.parse.quote(base_branch, safe="")
@@ -230,8 +230,8 @@ def team_review(task, requested_repo=None):
     except GatewayError as exc:
         if "HTTP 404" not in str(exc):
             raise
-        old_text = "# 313 Project Memory\\n\\nPersistent project notes and review history.\\n"
-    memory_note = ("\\n\\n## Review " + stamp + " UTC\\n"
+        old_text = "# 313 Project Memory\n\nPersistent project notes and review history.\n"
+    memory_note = ("\n\n## Review " + stamp + " UTC\n"
         "- Task: " + task.replace("\\n", " ")[:500] + "\\n"
         "- Source branch: " + project["branch"] + "\\n"
         "- Review report: " + report_path + "\\n"
@@ -267,14 +267,26 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "http://127.0.0.1")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-313-Token")
         self.end_headers()
+
+    def authorized(self):
+        try:
+            config = load_config()
+            expected = config.get("gateway_token", "")
+            supplied = self.headers.get("X-313-Token", "")
+            return bool(expected) and hmac.compare_digest(expected, supplied)
+        except Exception:
+            return False
 
     def do_GET(self):
         if self.path == "/health":
             self.send_json(200, {"ok": True, "service": "313-termux-team", "version": "0.1.0"})
             return
         if self.path == "/api/status":
+            if not self.authorized():
+                self.send_json(401, {"ok": False, "error": "unauthorized"})
+                return
             try:
                 config = load_config()
                 self.send_json(200, {"ok": True, "configured": True,
@@ -288,6 +300,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path != "/api/team/review":
             self.send_json(404, {"error": "not_found"})
+            return
+        if not self.authorized():
+            self.send_json(401, {"ok": False, "error": "unauthorized"})
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
