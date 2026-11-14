@@ -25,7 +25,7 @@ OmniRoute is not auto-enabled yet. Its model catalogue can include paid routes, 
 
 1. Install Termux from its official F-Droid or GitHub distribution.
 2. In Termux, clone this repository and enter its Termux folder:
-   git clone https://github.com/alyaswkdha31-ship-it/-313-android.git 313-source
+   git clone --branch feature/313-termux-agent-team https://github.com/alyaswkdha31-ship-it/-313-android.git 313-source
    cd ~/313-source/313-android/termux
 3. Run:
    bash setup-termux.sh
