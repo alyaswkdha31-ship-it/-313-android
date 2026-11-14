@@ -13,13 +13,12 @@ MAX_OUTPUT = 5000
 def request(url, token, payload=None, method=None):
     headers = {"Authorization": "Bearer " + token, "Accept": "application/vnd.github+json",
                "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "313-Termux-Remote-Bridge"}
-    raw = None
+    raw = json.dumps(payload).encode() if payload is not None else None
     if payload is not None:
         headers["Content-Type"] = "application/json"
-        raw = json.dumps(payload).encode()
     req = urllib.request.Request(url, data=raw, headers=headers, method=method)
-    with urllib.request.urlopen(req, timeout=25) as r:
-        return json.loads(r.read().decode()) if r.readable() else {}
+    with urllib.request.urlopen(req, timeout=25) as response:
+        return json.loads(response.read().decode())
 
 def api_url(repo, path, branch):
     return API + "/repos/" + urllib.parse.quote(repo, safe="/") + "/contents/" + urllib.parse.quote(path, safe="/") + "?ref=" + urllib.parse.quote(branch, safe="")
@@ -41,7 +40,8 @@ def run_fixed(action):
     if action == "doctor":
         cmd = ["omniroute", "doctor"]
     elif action == "fix_cli_dependency":
-        package_dir = str(Path(os.popen("npm root -g").read().strip()) / Path("omniroute"))
+        npm_root = subprocess.check_output(["npm", "root", "-g"], text=True, timeout=15).strip()
+        package_dir = str(Path(npm_root) / "omniroute")
         cmd = ["npm", "install", "--prefix", package_dir, "node-machine-id"]
     elif action == "health":
         return {"ok": True, "checks": {
@@ -83,10 +83,12 @@ def main():
     if not CONFIG.exists():
         raise SystemExit("313 config not found. Run the 313 Termux setup first.")
     cfg = json.loads(CONFIG.read_text())
-    repo, branch, token = cfg.get("github_repo"), cfg.get("github_branch"), cfg.get("github_token")
+    repo = cfg.get("github_repo")
+    branch = cfg.get("remote_bridge_branch") or cfg.get("github_branch")
+    token = cfg.get("github_token")
     if not repo or not branch or not token:
-        raise SystemExit("GitHub repo, branch, or token missing in private 313 config.")
-    print("313 remote bridge active. Only allowlisted actions are accepted.")
+        raise SystemExit("GitHub repo, bridge branch, or token missing in private 313 config.")
+    print("313 remote bridge active. Only allowlisted actions: health, doctor, fix_cli_dependency.")
     while True:
         try:
             command, command_sha = get_file(repo, COMMAND_PATH, branch, token)
