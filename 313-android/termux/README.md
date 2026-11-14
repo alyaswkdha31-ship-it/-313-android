@@ -1,66 +1,79 @@
 # 313 Team Gateway for Termux
 
-This is the first phone-local backend slice for the 313 multi-agent project workflow.
-It uses Python's standard library only and listens on 127.0.0.1:3131.
+The 313 Android app talks to this phone-local Python gateway on `127.0.0.1:3131`. The gateway uses the user's existing local OmniRoute service on `127.0.0.1:20128` and reads the configured GitHub repository directly.
 
-## Implemented in this phase
+## Implemented
 
-- Reads the configured GitHub repository directly; no repeated file uploads are needed.
-- Reads text source and project notes from the configured branch while skipping build output, binaries, and likely secret files.
-- Routes the Android main chat through OpenRouter's openrouter/free router via the local Termux gateway.
-- Verifies GitHub and OpenRouter credentials with GET /api/diagnostics before claiming the team is connected.
-- Runs three independent review roles concurrently through OpenRouter's openrouter/free router.
-- Produces a lead summary from the independent reports.
-- Creates a separate 313/team-review-* branch.
-- Saves the report under 313-android/AGENT_LOGS/ and appends review history to 313-android/PROJECT_MEMORY.md.
-- Does not modify source code, merge branches, or run project build commands in this first phase.
+- Reads the configured GitHub repository and branch; no repeated source-file uploads are needed.
+- Skips build output, binaries, and likely secret files when collecting project context.
+- Routes 313 chat and the three independent review roles through the local OmniRoute OpenAI-compatible API.
+- Uses OmniRoute's `auto` route and records the actual provider/model/cost headers when OmniRoute returns them.
+- Runs the three review roles concurrently, then asks OmniRoute for a synthesis.
+- Creates a separate `313/team-review-*` branch and saves the report under `313-android/AGENT_LOGS/`.
+- Appends review history to `313-android/PROJECT_MEMORY.md`.
+- Does not modify source code, merge branches, or run project build commands.
 
-## Free-only guarantee
+## Strict zero-cost protection
 
-The only model target currently enabled is OpenRouter's openrouter/free router. Its documented contract routes only to free models. There is no paid-model fallback list in this gateway. If the provider rejects the request, is rate-limited, or has no free capacity, the task fails rather than switching to a paid model.
+**Do not use 313 inference until OmniRoute's `freeAccessPolicy` is set to `strict`.**
 
-The OpenRouter free tier is rate-limited and its available models can change. Free availability is not unlimited. No credit purchase, top-up, billing setup, or card is part of this project.
+OmniRoute documents this strict policy as a fail-closed routing guard: it only trusts free-access entries with an independently documented hard stop. If the free pool is empty or exhausted, the request fails rather than stepping up to a paid route. This is intentionally stricter than merely selecting a model whose catalogue price is shown as zero.
 
-OmniRoute is not auto-enabled yet. Its model catalogue can include paid routes, so it must not be trusted as free merely because it appears in /v1/models. An optional OmniRoute adapter will only be added after its exact free-only routing contract is verified and explicitly configured.
+The setup script asks the operator to type `YES` after enabling strict free-access mode in OmniRoute. If the operator does not confirm, 313 blocks all chat and review inference. This is an explicit operator confirmation, not an automatic remote verification of OmniRoute's settings.
 
-## Setup
+Important:
+- OmniRoute itself is a free/open-source gateway, but the providers behind it have their own terms, quotas, and eligibility.
+- A model appearing in the OmniRoute catalogue does not prove that its current account route is free.
+- Free availability is not unlimited. If a provider rejects a request, reaches quota, or has no eligible strict-free route, 313 reports failure and does not switch to OpenRouter or another paid service.
+- The team roles are separate review passes. OmniRoute may route more than one role to the same provider/model; the returned provider/model headers are recorded so this is visible.
+- ChatGPT in this current ChatGPT conversation is not an app API credential. 313 cannot call this GPT-6 session as a hidden backend provider. It can be used as a reviewer when the user shares the report here.
 
-1. Install Termux from its official F-Droid or GitHub distribution.
-2. In Termux, clone this repository and enter its Termux folder:
-   git clone --branch feature/313-termux-agent-team https://github.com/alyaswkdha31-ship-it/-313-android.git 313-source
+## Setup / upgrade
+
+1. Install or start OmniRoute in Termux. Its local API should listen on `http://127.0.0.1:20128`.
+2. In OmniRoute, create/copy an API key from Dashboard → Endpoints.
+3. Enable `freeAccessPolicy = strict` in OmniRoute before allowing inference.
+4. Clone this branch or update an existing checkout:
+   ```bash
+   git clone --branch feature/313-real-provider-team https://github.com/alyaswkdha31-ship-it/-313-android.git 313-source
    cd ~/313-source/313-android/termux
-3. Run:
    bash setup-termux.sh
-4. During setup, provide:
-   - A GitHub fine-grained personal access token restricted to the single repository, with Contents read/write.
-   - An OpenRouter API key from a free account. Do not add credits or enable paid billing.
-5. Start the service with:
+   ```
+5. The script preserves existing GitHub settings and gateway token. It reuses `~/.omniroute-key` if present; otherwise it asks for the OmniRoute key without echoing it.
+6. Type `YES` only if strict free-access mode is enabled in OmniRoute. Otherwise 313 keeps inference blocked.
+7. Start the gateway:
+   ```bash
    python ~/313-team/313_team_server.py
-6. Open 313 → ⚙ or فريق المشاريع → إعداد, then paste the one-time gateway token printed by setup. The same encrypted token is used for the main chat and project team.
-7. Check http://127.0.0.1:3131/health locally.
+   ```
+8. If the script printed a new `GATEWAY_TOKEN`, paste it into 313 → Team settings. Existing tokens are preserved.
+9. Check `http://127.0.0.1:3131/health`.
 
-Credentials are stored only in Termux's private home directory in ~/.config/313/team.json with mode 0600. Never commit this file, paste credentials into ChatGPT, or share it.
+## Credentials
+
+- GitHub credentials and the 313 gateway token remain in `~/.config/313/team.json` with mode `0600`.
+- The OmniRoute API key is read from `~/.omniroute-key` with mode `0600`.
+- Secrets are not committed to GitHub or embedded in the APK. Never paste keys into ChatGPT or a project report.
 
 ## API
 
-- GET /health: process health.
-- GET /api/status: configuration status (never returns credentials).
-- GET /api/diagnostics: read-only GitHub repository and OpenRouter key validation; does not generate a model completion.
-- POST /api/chat with JSON {"messages":[{"role":"user","content":"Hello"}]}: main chat through openrouter/free only.
-- POST /api/team/review with JSON:
-  {"task":"Review project 313 for build and runtime defects"}
+- `GET /health`: gateway process health.
+- `GET /api/status`: configuration status without returning credentials.
+- `GET /api/diagnostics`: checks GitHub access and authenticated OmniRoute `GET /v1/models`. This does not consume a model completion and does not prove a model can answer.
+- `POST /api/chat`: sends chat to OmniRoute's configured model (default `auto`), only after strict-free confirmation.
+- `POST /api/team/review`: reads the configured repository, runs three review roles concurrently, and saves the report/memory to a new GitHub branch.
 
 The repository name is locked to the repository configured during setup. A request cannot switch to another repository.
 
 ## Current limitations
 
-- This phase is a read-only multi-agent review and GitHub memory writer, not autonomous source-code editing.
-- The Android app now includes a Team Console screen that calls this local API over loopback. The gateway token is stored in Android Keystore-backed encryption.
-- The server must be started in Termux; persistent boot startup is not configured.
-- GitHub fine-grained token setup is a one-time manual step. It must be limited to the intended repository.
-- OpenRouter's openrouter/free may select different free models on different requests. It does not guarantee Claude or official GPT models.
-- A failed agent is reported; the gateway does not silently retry against a paid model.
+- This is a read-only multi-agent review and GitHub memory writer, not autonomous source-code editing.
+- The Android app calls the Termux gateway over loopback. The gateway token is stored using Android Keystore-backed encryption.
+- The Termux service must be started manually; boot startup is not configured.
+- GitHub fine-grained token needs Contents read/write for the intended repository.
+- OmniRoute's free providers and quotas can change. Provider-level success is only confirmed by a real completion; the diagnostic endpoint checks API reachability/model visibility only.
+- If OmniRoute does not return provider/model/cost headers, the report records that metadata as unavailable rather than guessing.
+- This gateway does not provide a direct GPT-6 API connection. ChatGPT can review results in the current conversation, but the app cannot invoke this session as a backend model.
 
-## Security notes
+## Security
 
-The server binds only to loopback, never 0.0.0.0. It does not log request bodies or authorization headers. The current gateway is intended for one trusted device user. Do not expose port 3131 through a public tunnel.
+The gateway binds only to loopback, never `0.0.0.0`. It does not log request bodies or authorization headers. Do not expose port 3131 or OmniRoute's port 20128 through a public tunnel.
