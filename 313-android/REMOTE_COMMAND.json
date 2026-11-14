@@ -1,8 +1,13 @@
 {
-  "id": "313-chatgpt-doctor-20261115-001",
-  "status": "completed",
-  "action": "doctor",
-  "created_at": "2026-11-14T22:08:55.370Z",
+  "id": "313-chat-test-20261115-0118",
+  "status": "pending",
+  "action": "chat",
+  "created_at": "2026-11-14T22:18:00Z",
   "requested_by": "ChatGPT GitHub connector",
-  "completed_at": 1794694157
+  "messages": [
+    {
+      "role": "user",
+      "content": "Reply exactly: 313 remote chat connected."
+    }
+  ]
 }
