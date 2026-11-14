@@ -1,11 +1,22 @@
 {
-  "id": "313-chat-test-20261115-0118",
-  "action": "chat",
-  "completed_at": 1794694733,
+  "id": "313-health-20261115-0200",
+  "action": "health",
+  "completed_at": 1794695316,
   "result": {
     "ok": true,
-    "answer": "313 remote chat connected.",
-    "provider": "OpenRouter Free Router",
-    "paid_fallback": false
+    "checks": {
+      "313_server_3131": {
+        "reachable": true,
+        "status": 200
+      },
+      "313_server_3132": {
+        "reachable": true,
+        "status": 200
+      },
+      "omniroute_models": {
+        "reachable": true,
+        "models_visible": 3483
+      }
+    }
   }
 }
