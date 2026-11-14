@@ -7,6 +7,7 @@ import json
 import os
 import re
 import hmac
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -28,6 +29,7 @@ SKIP_PARTS = {".git", ".gradle", ".idea", "build", "dist", "node_modules",
 SECRET_NAME = re.compile(r"(^|/)(\.env[^/]*|.*(secret|credential|private.?key).*)$", re.I)
 GITHUB_API = "https://api.github.com"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+REVIEW_LOCK = threading.Lock()
 
 
 class GatewayError(Exception):
@@ -240,6 +242,12 @@ def team_review(task, requested_repo=None):
         "- Note: this was a read-only review; no source files were modified.\n")
     memory_commit = github_put(config, repo, branch, memory_path, old_text + memory_note,
         "313: update persistent project memory")
+    config["github_branch"] = branch
+    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = CONFIG_PATH.with_suffix(".tmp")
+    temp_path.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.chmod(temp_path, 0o600)
+    temp_path.replace(CONFIG_PATH)
     return {"ok": True, "repo": repo, "source_branch": project["branch"],
         "review_branch": branch, "report_path": report_path,
         "commit": memory_commit or commit, "agents_succeeded": len(good),
@@ -312,7 +320,8 @@ class Handler(BaseHTTPRequestHandler):
             task = str(body.get("task", "")).strip()
             if not task or len(task) > 4000:
                 raise GatewayError("اكتب مهمة من 1 إلى 4000 حرف.")
-            result = team_review(task, body.get("repo"))
+            with REVIEW_LOCK:
+                result = team_review(task, body.get("repo"))
             self.send_json(200, result)
         except Exception as exc:
             self.send_json(400, {"ok": False, "error": str(exc), "paid_fallback": False})
