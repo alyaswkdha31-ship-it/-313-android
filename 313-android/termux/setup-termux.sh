@@ -18,8 +18,8 @@ if [[ ! "$REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
   echo "Invalid repository format."
   exit 1
 fi
-read -r -p "GitHub branch to review [feature/runcrate-free-only]: " GH_BRANCH
-GH_BRANCH="${GH_BRANCH:-feature/runcrate-free-only}"
+read -r -p "GitHub branch to review [feature/313-termux-agent-team]: " GH_BRANCH
+GH_BRANCH="${GH_BRANCH:-feature/313-termux-agent-team}"
 read -r -s -p "GitHub fine-grained token (Contents read/write for this repo): " GH_TOKEN
 echo
 read -r -s -p "OpenRouter API key (free account; do not add credits): " OR_KEY
