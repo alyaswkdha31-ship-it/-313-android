@@ -198,6 +198,18 @@ public class TeamConsoleActivity extends Activity {
         }
     }
 
+    private String providerModelSummary(JSONObject data) {
+        JSONObject visible = data.optJSONObject("provider_models_visible");
+        if (visible == null) return "نماذج Gemini/Claude/DeepSeek: لم تُعرض بياناتها.";
+        JSONArray gemini = visible.optJSONArray("gemini");
+        JSONArray claude = visible.optJSONArray("claude");
+        JSONArray deepseek = visible.optJSONArray("deepseek");
+        return "معرّفات ظاهرة فقط (ليست إثباتاً للمجانية): Gemini " +
+            (gemini == null ? 0 : gemini.length()) + " • Claude " +
+            (claude == null ? 0 : claude.length()) + " • DeepSeek " +
+            (deepseek == null ? 0 : deepseek.length());
+    }
+
     private void refreshStatus() {
         if (!hasToken()) {
             status.setText("○ أدخل رمز Termux لربط الفريق.");
@@ -218,6 +230,8 @@ public class TeamConsoleActivity extends Activity {
                     output.setText("فحص الاتصال ناجح.\nGitHub: متصل • " + data.optString("github_repo") +
                         "\nOmniRoute: متصل على الهاتف" +
                         "\nالنماذج الظاهرة: " + data.optInt("models_visible") +
+                        "\n" + providerModelSummary(data) +
+                        "\n" + providerModelSummary(data) +
                         "\nنماذج عينة: " + data.optJSONArray("model_sample") +
                         "\nStrict free-access: أكّد المستخدم تفعيله في OmniRoute" +
                         "\nاختبار إجابة فعلية: لم يُنفّذ بعد (يُختبر عند تشغيل المراجعة)" +
@@ -284,7 +298,7 @@ public class TeamConsoleActivity extends Activity {
                         if (agent.optBoolean("ok")) {
                             providers.append(": ").append(agent.optString("provider", "المزوّد غير معلن"))
                                 .append(" / ").append(agent.optString("model", "النموذج غير معلن"));
-                            if (agent.has("cost_usd")) providers.append(" • $").append(agent.optString("cost_usd"));
+                            if (!agent.isNull("cost_usd")) providers.append(" • $").append(agent.optString("cost_usd"));
                         } else {
                             providers.append(": فشل • ").append(agent.optString("error", "غير معروف"));
                         }
