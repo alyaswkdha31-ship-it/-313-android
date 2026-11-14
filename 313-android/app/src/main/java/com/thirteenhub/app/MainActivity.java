@@ -14,6 +14,7 @@ import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.content.Context;
+import android.content.Intent;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -222,6 +223,10 @@ public class MainActivity extends Activity {
                 ? "● مفتاح Runcrate محفوظ بأمان على الجهاز"
                 : "○ اربط مفتاح Runcrate المجاني من ⚙ لبدء المحادثة");
         connectionStatus.setTextColor(configured ? Color.rgb(113, 214, 164) : muted);
+
+        Button teamButton = button("فريق المشاريع", true);
+        teamButton.setOnClickListener(v -> startActivity(new Intent(this, TeamConsoleActivity.class)));
+        root.addView(teamButton, withMargins(-1, -2, 0, dp(8), 0, dp(8)));
     }
 
     private void showKeyDialog(boolean allowSkip) {
