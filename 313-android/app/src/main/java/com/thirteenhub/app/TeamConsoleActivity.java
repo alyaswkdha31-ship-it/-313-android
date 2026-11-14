@@ -231,7 +231,6 @@ public class TeamConsoleActivity extends Activity {
                         "\nOmniRoute: متصل على الهاتف" +
                         "\nالنماذج الظاهرة: " + data.optInt("models_visible") +
                         "\n" + providerModelSummary(data) +
-                        "\n" + providerModelSummary(data) +
                         "\nنماذج عينة: " + data.optJSONArray("model_sample") +
                         "\nStrict free-access: أكّد المستخدم تفعيله في OmniRoute" +
                         "\nاختبار إجابة فعلية: لم يُنفّذ بعد (يُختبر عند تشغيل المراجعة)" +
