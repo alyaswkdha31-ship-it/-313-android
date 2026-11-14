@@ -59,7 +59,7 @@ def load_config():
         raise GatewayError("ملف إعداد 313 غير صالح: " + str(exc))
     if not data.get("github_repo") or not data.get("github_token"):
         raise GatewayError("إعداد GitHub ناقص. أعد تشغيل setup-termux.sh.")
-    key = data.get("omniroute_api_key", "").strip()
+    key = str(data.get("omniroute_api_key") or "").strip()
     if not key and OMNIROUTE_KEY_PATH.exists():
         key = OMNIROUTE_KEY_PATH.read_text(encoding="utf-8").strip()
     if not key:
