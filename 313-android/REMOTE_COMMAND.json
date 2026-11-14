@@ -1,6 +1,6 @@
 {
   "id": "313-chat-test-20261115-0118",
-  "status": "pending",
+  "status": "completed",
   "action": "chat",
   "created_at": "2026-11-14T22:18:00Z",
   "requested_by": "ChatGPT GitHub connector",
@@ -9,5 +9,6 @@
       "role": "user",
       "content": "Reply exactly: 313 remote chat connected."
     }
-  ]
+  ],
+  "completed_at": 1794694743
 }
