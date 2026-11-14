@@ -30,10 +30,10 @@ SECRET_NAME = re.compile(r"(^|/)(\.env[^/]*|.*(secret|credential|private.?key).*
 SECRET_BASENAMES = {"local.properties", "gradle.properties", "keystore.properties",
     "secrets.properties", "credentials.json", "service-account.json", ".npmrc", ".pypirc"}
 SECRET_PATTERNS = [
-    re.compile(r"(?i)(ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})"),
-    re.compile(r"(?i)(sk-or-v1-[A-Za-z0-9_-]{20,}|rc_live_[A-Za-z0-9_-]{12,})"),
+    re.compile(r"(?i)(gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})"),
+    re.compile(r"(?i)(sk-or-v1-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9_-]{24,}|rc_live_[A-Za-z0-9_-]{12,})"),
     re.compile(r"(?i)(AIza[0-9A-Za-z_-]{20,}|AKIA[0-9A-Z]{16})"),
-    re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")
+    re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----", re.S)
 ]
 
 def redact_secrets(value):
