@@ -41,8 +41,8 @@ def redact_secrets(value):
         value = pattern.sub("[REDACTED_SECRET]", value)
     return value
 GITHUB_API = "https://api.github.com"
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-OPENROUTER_KEY_URL = "https://openrouter.ai/api/v1/key"
+OMNIROUTE_DEFAULT_URL = "http://127.0.0.1:20128"
+OMNIROUTE_KEY_PATH = Path.home() / ".omniroute-key"
 REVIEW_LOCK = threading.Lock()
 
 
@@ -59,8 +59,14 @@ def load_config():
         raise GatewayError("ملف إعداد 313 غير صالح: " + str(exc))
     if not data.get("github_repo") or not data.get("github_token"):
         raise GatewayError("إعداد GitHub ناقص. أعد تشغيل setup-termux.sh.")
-    if not data.get("openrouter_api_key"):
-        raise GatewayError("مفتاح OpenRouter غير موجود. أضفه من إعداد Termux.")
+    key = data.get("omniroute_api_key", "").strip()
+    if not key and OMNIROUTE_KEY_PATH.exists():
+        key = OMNIROUTE_KEY_PATH.read_text(encoding="utf-8").strip()
+    if not key:
+        raise GatewayError("مفتاح OmniRoute المحلي غير موجود. تحقق من ~/.omniroute-key.")
+    data["_omniroute_api_key_runtime"] = key
+    data["omniroute_base_url"] = str(data.get("omniroute_base_url") or OMNIROUTE_DEFAULT_URL).rstrip("/")
+    data["omniroute_model"] = str(data.get("omniroute_model") or "auto")
     return data
 
 
@@ -136,16 +142,43 @@ def read_project(config, repo):
         "files": included, "context": "\n".join(chunks)}
 
 
-def openrouter_headers(config):
-    return {"Authorization": "Bearer " + config["openrouter_api_key"],
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://github.com/alyaswkdha31-ship-it/-313-android",
-        "X-Title": "313 Free AI"}
+def omniroute_headers(config):
+    return {"Authorization": "Bearer " + config["_omniroute_api_key_runtime"],
+        "Content-Type": "application/json", "Accept": "application/json",
+        "User-Agent": "313-Termux-Team"}
+
+
+def require_strict_free(config):
+    if config.get("omniroute_strict_free_confirmed") is not True:
+        raise GatewayError(
+            "توقفت حماية 313: فعّل Free Access Policy = Strict داخل OmniRoute، "
+            "ثم أعد إعداد 313 وأكّد ذلك. لن أرسل أي طلب قبل التأكيد."
+        )
+
+
+def omniroute_request(config, path, payload=None, timeout=30):
+    raw = None if payload is None else json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(
+        config["omniroute_base_url"] + path, data=raw,
+        headers=omniroute_headers(config),
+        method="POST" if payload is not None else "GET")
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            body = response.read()
+            data = json.loads(body.decode("utf-8")) if body else {}
+            return response.status, data, dict(response.headers.items())
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", "replace")[:1200]
+        raise GatewayError("OmniRoute HTTP " + str(exc.code) + ": " + body)
+    except urllib.error.URLError as exc:
+        raise GatewayError("تعذر الاتصال بـOmniRoute المحلي: " + str(exc.reason))
 
 
 def provider_diagnostics(config):
-    result = {"github_ok": False, "openrouter_ok": False,
-        "free_only": True, "paid_fallback": False}
+    result = {"github_ok": False, "omniroute_ok": False,
+        "provider": "OmniRoute local gateway",
+        "free_only_gate_confirmed": config.get("omniroute_strict_free_confirmed") is True,
+        "paid_fallback": False}
     try:
         metadata = github_get(config, "/repos/" + urllib.parse.quote(config["github_repo"], safe="/"))
         result["github_ok"] = bool(metadata.get("full_name"))
@@ -153,51 +186,53 @@ def provider_diagnostics(config):
     except Exception as exc:
         result["github_error"] = redact_secrets(str(exc))[:240]
     try:
-        _, key_data = http_json(OPENROUTER_KEY_URL,
-            {"Authorization": "Bearer " + config["openrouter_api_key"],
-             "Accept": "application/json", "User-Agent": "313-Free-AI"}, timeout=15)
-        data = key_data.get("data", key_data)
-        result["openrouter_ok"] = True
-        for field in ("label", "usage", "limit", "is_free_tier", "rate_limit", "free_model_daily_requests"):
-            if field in data:
-                result[field] = data[field]
+        _, model_data, _ = omniroute_request(config, "/v1/models", timeout=12)
+        models = model_data.get("data") or []
+        result["omniroute_ok"] = isinstance(models, list)
+        result["models_visible"] = len(models)
+        result["model_completion_tested"] = False
+        result["model_sample"] = [str(x.get("id", "")) for x in models[:12] if isinstance(x, dict)]
     except Exception as exc:
-        result["openrouter_error"] = redact_secrets(str(exc))[:240]
-    result["ready"] = result["github_ok"] and result["openrouter_ok"]
+        result["omniroute_error"] = redact_secrets(str(exc))[:240]
+    result["ready"] = (result["github_ok"] and result["omniroute_ok"]
+        and result["free_only_gate_confirmed"])
+    if not result["free_only_gate_confirmed"]:
+        result["free_only_warning"] = "Strict free-access mode has not been confirmed; inference is blocked."
     return result
+
+
+def call_omniroute(config, messages, temperature=0.2):
+    require_strict_free(config)
+    body = {"model": config["omniroute_model"], "temperature": temperature,
+        "messages": messages}
+    _, result, headers = omniroute_request(config, "/v1/chat/completions",
+        body, timeout=150)
+    choices = result.get("choices") or []
+    if not choices:
+        raise GatewayError("OmniRoute لم يرجع إجابة.")
+    answer = choices[0].get("message", {}).get("content", "")
+    if not isinstance(answer, str) or not answer.strip():
+        raise GatewayError("وصل رد فارغ من OmniRoute.")
+    cost = headers.get("X-OmniRoute-Response-Cost") or headers.get("x-omniroute-response-cost")
+    try:
+        cost_value = float(cost) if cost is not None else None
+    except (TypeError, ValueError):
+        cost_value = None
+    if cost_value is not None and cost_value > 0:
+        raise GatewayError("أوقف 313 النتيجة لأن OmniRoute أبلغ عن تكلفة غير صفرية: " + str(cost_value))
+    return {"text": answer.strip(),
+        "provider": headers.get("X-OmniRoute-Provider") or headers.get("x-omniroute-provider") or "غير معلن",
+        "model": headers.get("X-OmniRoute-Model") or headers.get("x-omniroute-model") or config["omniroute_model"],
+        "cost_usd": cost_value,
+        "decision": headers.get("X-OmniRoute-Decision") or headers.get("x-omniroute-decision") or ""}
 
 
 def chat_completion(config, messages):
     system = {"role": "system", "content":
         "You are the assistant inside 313. Be accurate, concise, and helpful. "
-        "Use only free model routing. Never claim tools or actions were used unless they were."}
-    payload_messages = [system] + messages[-20:]
-    body = {"model": "openrouter/free", "temperature": 0.4,
-        "messages": payload_messages}
-    _, result = http_json(OPENROUTER_URL, openrouter_headers(config),
-        body, timeout=120, method="POST")
-    choices = result.get("choices") or []
-    if not choices:
-        raise GatewayError("الموجّه المجاني لم يرجع إجابة.")
-    answer = choices[0].get("message", {}).get("content", "")
-    if not isinstance(answer, str) or not answer.strip():
-        raise GatewayError("وصل رد فارغ من النموذج المجاني.")
-    return answer.strip()
-
-
-def call_openrouter(config, system_prompt, user_prompt):
-    body = {"model": "openrouter/free", "temperature": 0.2,
-        "messages": [{"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}]}
-    headers = {"Authorization": "Bearer " + config["openrouter_api_key"],
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://github.com/alyaswkdha31-ship-it/-313-android",
-        "X-Title": "313 Termux Agent Team"}
-    _, result = http_json(OPENROUTER_URL, headers, body, timeout=120, method="POST")
-    choices = result.get("choices") or []
-    if not choices:
-        raise GatewayError("النموذج المجاني لم يرجع إجابة.")
-    return choices[0].get("message", {}).get("content", "").strip()
+        "Use only the configured strict zero-cost OmniRoute route. Never claim tools or actions were used unless they were."}
+    result = call_omniroute(config, [system] + messages[-20:], temperature=0.4)
+    return result["text"]
 
 
 def run_agent(config, role, task, project):
@@ -209,8 +244,11 @@ def run_agent(config, role, task, project):
     prompt = ("ROLE: " + role + "\nTASK: " + task + "\nREPOSITORY: " + project["repo"] +
         "\nBRANCH: " + project["branch"] + "\nFILES INCLUDED: " +
         ", ".join(project["files"]) + "\n\nPROJECT SOURCE:\n" + project["context"])
-    return call_openrouter(config, system, prompt)
-
+    result = call_omniroute(config, [
+        {"role": "system", "content": system},
+        {"role": "user", "content": prompt}
+    ], temperature=0.2)
+    return result
 
 def github_put(config, repo, branch, path, content, message):
     repo_q = urllib.parse.quote(repo, safe="/")
@@ -263,7 +301,8 @@ def team_review(task, requested_repo=None):
         for future in concurrent.futures.as_completed(futures):
             role = futures[future]
             try:
-                results.append({"role": role, "ok": True, "text": future.result()})
+                agent_result = future.result()
+                results.append({"role": role, "ok": True, **agent_result})
             except Exception as exc:
                 results.append({"role": role, "ok": False, "error": str(exc)})
     good = [x for x in results if x["ok"]]
@@ -277,8 +316,14 @@ def team_review(task, requested_repo=None):
         "and tests needed. Do not claim changes or tests were performed.\\n\\n" +
         json.dumps(report, ensure_ascii=False))
     try:
-        report["team_summary"] = call_openrouter(config,
-            "You are the lead reviewer for 313. No paid fallback.", synthesis_prompt)
+        summary_result = call_omniroute(config, [
+            {"role": "system", "content": "You are the lead reviewer for 313. Strict zero-cost routing only."},
+            {"role": "user", "content": synthesis_prompt}
+        ], temperature=0.1)
+        report["team_summary"] = summary_result["text"]
+        report["synthesis_provider"] = summary_result["provider"]
+        report["synthesis_model"] = summary_result["model"]
+        report["synthesis_cost_usd"] = summary_result["cost_usd"]
     except Exception as exc:
         report["team_summary"] = "تعذر تلخيص تقارير الفريق تلقائياً: " + str(exc)
     report_text = json.dumps(report, ensure_ascii=False, indent=2)
@@ -367,8 +412,9 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json(200, result)
                 else:
                     self.send_json(200, {"ok": True, "configured": True,
-                        "repo": config["github_repo"], "provider": "OpenRouter Free Models Router",
-                        "free_only": True, "paid_fallback": False,
+                        "repo": config["github_repo"], "provider": "OmniRoute local gateway",
+                        "free_only": config.get("omniroute_strict_free_confirmed") is True,
+                        "paid_fallback": False,
                         "note": "Use /api/diagnostics to verify provider credentials."})
             except Exception as exc:
                 self.send_json(200, {"ok": False, "configured": False, "message": redact_secrets(str(exc))[:240]})
@@ -402,7 +448,7 @@ class Handler(BaseHTTPRequestHandler):
                     clean.append({"role": item["role"], "content": content})
                 answer = chat_completion(config, clean)
                 self.send_json(200, {"ok": True, "answer": answer,
-                    "provider": "OpenRouter Free Router", "paid_fallback": False})
+                    "provider": "OmniRoute local gateway", "paid_fallback": False})
                 return
             task = str(body.get("task", "")).strip()
             if not task or len(task) > 4000:
@@ -423,5 +469,5 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     print("313 Team Gateway listening on http://127.0.0.1:" + str(PORT))
-    print("Free-only mode: OpenRouter openrouter/free; paid fallback is disabled.")
+    print("Provider: local OmniRoute. Inference is blocked until strict free-only mode is confirmed.")
     ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()
