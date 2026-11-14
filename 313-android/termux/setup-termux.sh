@@ -17,6 +17,13 @@ echo "No OpenRouter key is required by 313."
 echo "Inference stays blocked unless you confirm OmniRoute strict free-access mode."
 python - "$CONFIG" "$OMNI_KEY" <<'PY'
 import getpass, json, os, secrets, sys
+# The Python program is supplied through a heredoc, so stdin is the script itself.
+# Read interactive answers from the Termux terminal instead.
+try:
+    sys.stdin = open('/dev/tty', 'r', encoding='utf-8')
+except OSError:
+    print('No interactive terminal found; run this script directly in Termux.')
+    raise SystemExit(2)
 config_path, key_path = sys.argv[1:]
 data = {}
 if os.path.exists(config_path):
