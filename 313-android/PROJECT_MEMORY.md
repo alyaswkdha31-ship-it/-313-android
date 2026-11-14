@@ -17,9 +17,10 @@
 - Android package: com.thirteenhub.app
 
 ## Current implementation status
-- Android chat screen exists with a Runcrate free-model allowlist and Android Keystore-backed credential storage.
-- A Termux Python gateway is being added under 313-android/termux.
-- First team phase is read-only multi-agent review via OpenRouter's free-only router.
+- Android main chat now routes through the Termux loopback gateway to OpenRouter's `openrouter/free` router; it no longer sends requests to Runcrate.
+- The app and Team Console share the encrypted Termux gateway token stored with Android Keystore.
+- Termux gateway exposes `/api/diagnostics` to validate GitHub repository access and OpenRouter key validity without consuming a model completion.
+- Main chat uses `/api/chat`; team review remains a read-only multi-agent GitHub review using OpenRouter's free-only router.
 - Review reports and this memory are saved to a separate review branch.
 - Autonomous source-code edits, build execution from the phone gateway, OmniRoute provider integration, and multi-repository selection are not yet implemented.
 
@@ -28,3 +29,11 @@
 - Record decisions and completed work here.
 - Store review reports under 313-android/AGENT_LOGS.
 - Keep project source changes separate from review/memory commits.
+
+
+## 2026-11-14 provider failure and remediation
+- User supplied a Runcrate HTTP 402 screenshot: `github_link_required`; Runcrate stated free usage starts on 2026-12-03 and suggested adding credit. The user must not add credit or payment details.
+- Decision: remove Runcrate from the main chat execution path. Do not infer model availability from a locally saved Runcrate key.
+- New main-chat path: Android app -> 127.0.0.1:3131 `/api/chat` -> OpenRouter `openrouter/free` only.
+- New diagnostics path: `/api/diagnostics` validates configured GitHub repository access and OpenRouter key using read-only API calls; it does not spend a completion request.
+- CI policy tests passed in workflow 43631953587; Android build was still running when this note was written. Physical-phone and live-provider tests remain pending.
