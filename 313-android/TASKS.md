@@ -6,6 +6,14 @@
 - [x] Add Android Team Console screen and encrypted gateway-token storage.
 - [x] Add GitHub read-only project review and persistent report/memory branch workflow.
 - [x] Run Python policy tests and Android debug APK CI build successfully (workflow run 43629920804).
+- [x] Remove Runcrate from the main-chat request path after confirmed HTTP 402 GitHub-link eligibility block.
+- [x] Route main chat through Termux to OpenRouter `openrouter/free` only.
+- [x] Add read-only `/api/diagnostics` for GitHub and OpenRouter credential checks.
+- [x] Add Team Console diagnostics UI and shared encrypted gateway-token use.
+- [x] Add policy tests for free-only chat and provider diagnostics.
+- [ ] Verify latest workflow 43631953587 completes and retrieve its APK artifact.
+- [ ] Update Termux local gateway on the phone and run `/api/diagnostics`.
+- [ ] Test one main-chat prompt and one project-team review with the user's real local credentials.
 - [ ] Install and test on the user's Android phone with Termux.
 - [ ] Add approved patch proposal and diff review flow.
 - [ ] Add user-approved source-file application on a dedicated branch.
