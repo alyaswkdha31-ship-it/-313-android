@@ -26,6 +26,17 @@ class GatewayPolicyTests(unittest.TestCase):
         self.assertIsNotNone(gateway.SECRET_NAME.search(".env"))
         self.assertIsNotNone(gateway.SECRET_NAME.search("app/private_key.pem"))
 
+    def test_source_secrets_are_redacted(self):
+        sample = "token=ghp_" + "A" * 30 + " api=sk-or-v1-" + "B" * 30
+        cleaned = gateway.redact_secrets(sample)
+        self.assertNotIn("ghp_", cleaned)
+        self.assertNotIn("sk-or-v1-", cleaned)
+        self.assertIn("[REDACTED_SECRET]", cleaned)
+
+    def test_local_credential_files_are_excluded(self):
+        self.assertIn("local.properties", gateway.SECRET_BASENAMES)
+        self.assertIn("gradle.properties", gateway.SECRET_BASENAMES)
+
     def test_binary_and_build_directories_are_excluded(self):
         self.assertIn("build", gateway.SKIP_PARTS)
         self.assertIn(".gradle", gateway.SKIP_PARTS)
