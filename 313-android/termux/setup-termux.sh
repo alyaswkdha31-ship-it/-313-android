@@ -55,7 +55,7 @@ else:
 confirm = input("Have you set freeAccessPolicy=strict and excludeTosAvoid=true in OmniRoute? Type YES to allow AI requests: ").strip()
 strict_confirmed = confirm == "YES"
 data.update({
-    "github_repo": repo, "github_branch": branch, "github_token": github_token,
+    "github_repo": repo, "github_branch": branch, "remote_bridge_branch": "feature/313-termux-remote-bridge", "github_token": github_token,
     "gateway_token": data.get("gateway_token") or secrets.token_urlsafe(32),
     "omniroute_base_url": data.get("omniroute_base_url") or "http://127.0.0.1:20128",
     "omniroute_model": "auto", "omniroute_strict_free_confirmed": strict_confirmed,
