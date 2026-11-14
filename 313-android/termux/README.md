@@ -24,14 +24,15 @@ OmniRoute is not auto-enabled yet. Its model catalogue can include paid routes, 
 ## Setup
 
 1. Install Termux from its official F-Droid or GitHub distribution.
-2. Copy 313_team_server.py and setup-termux.sh into $HOME/313-team/.
+2. In Termux, clone this repository and enter its Termux folder:
+   git clone https://github.com/alyaswkdha31-ship-it/-313-android.git 313-source
+   cd ~/313-source/313-android/termux
 3. Run:
    bash setup-termux.sh
-   python 313_team_server.py
 4. During setup, provide:
    - A GitHub fine-grained personal access token restricted to the single repository, with Contents read/write.
    - An OpenRouter API key from a free account. Do not add credits or enable paid billing.
-5. Check http://127.0.0.1:3131/health and /api/status locally.
+5. Start the service with: python ~/313-team/313_team_server.py\n6. Open 313 → فريق المشاريع → إعداد, then paste the one-time gateway token printed by setup.\n7. Check http://127.0.0.1:3131/health locally.
 
 Credentials are stored only in Termux's private home directory in ~/.config/313/team.json with mode 0600. Never commit this file, paste credentials into ChatGPT, or share it.
 
@@ -47,7 +48,7 @@ The repository name is locked to the repository configured during setup. A reque
 ## Current limitations
 
 - This phase is a read-only multi-agent review and GitHub memory writer, not autonomous source-code editing.
-- The Android app UI is not yet connected to this local API.
+- The Android app now includes a Team Console screen that calls this local API over loopback. The gateway token is stored in Android Keystore-backed encryption.
 - The server must be started in Termux; persistent boot startup is not configured.
 - GitHub fine-grained token setup is a one-time manual step. It must be limited to the intended repository.
 - OpenRouter's openrouter/free may select different free models on different requests. It does not guarantee Claude or official GPT models.
