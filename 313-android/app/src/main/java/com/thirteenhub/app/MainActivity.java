@@ -292,14 +292,16 @@ public class MainActivity extends Activity {
         final String modelId = selectedModelId();
         final JSONArray requestHistory = copyArray(history);
         worker.execute(() -> {
-            RuncrateApi.ChatResult result;
+            RuncrateApi.ChatResult result = null;
+            String localFailure = null;
             try {
                 String key = SecureCredentialStore.readRuncrateKey(this);
                 result = RuncrateApi.chat(key, modelId, requestHistory);
             } catch (Exception e) {
-                result = null;
+                localFailure = describeLocalFailure(e);
             }
             final RuncrateApi.ChatResult response = result;
+            final String failure = localFailure;
             mainHandler.post(() -> {
                 sending = false;
                 if (messagesBox.getChildCount() > 0) messagesBox.removeViewAt(messagesBox.getChildCount() - 1);
@@ -313,13 +315,40 @@ public class MainActivity extends Activity {
                     } catch (Exception ignored) { }
                 } else if (response != null && RuncrateFreeModels.isFreeLimitError(response.errorCode)) {
                     addBubble("الحصة المجانية غير متاحة حالياً أو الضغط مرتفع. لم يتم استخدام أي نموذج مدفوع. جرّب لاحقاً أو اختر نموذجاً مجانياً آخر.", false);
+                } else if (response != null) {
+                    addBubble(describeProviderFailure(response), false);
                 } else {
-                    addBubble("تعذر إكمال الطلب. تحقق من اتصال الإنترنت ومفتاح Runcrate، ثم حاول مرة أخرى.", false);
+                    addBubble(failure == null ? "تعذر تحديد سبب فشل الاتصال." : failure, false);
                 }
             });
         });
         ((InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE))
                 .hideSoftInputFromWindow(composer.getWindowToken(), 0);
+    }
+
+    private String describeLocalFailure(Exception error) {
+        String type = error.getClass().getSimpleName();
+        if (type.contains("UnknownHost")) return "تعذر الوصول إلى خادم Runcrate. تحقق من الإنترنت أو DNS.";
+        if (type.contains("SocketTimeout")) return "انتهت مهلة الاتصال بخادم Runcrate. حاول مرة أخرى لاحقاً.";
+        if (type.contains("SSL") || type.contains("Certificate")) return "فشل الاتصال الآمن بخادم Runcrate. تحقق من التاريخ والوقت وتحديث النظام.";
+        if (type.contains("AEADBadTag") || type.contains("UnrecoverableKey")) return "تعذر فك تشفير المفتاح المحفوظ. احذف المفتاح وأعد إدخاله من الإعدادات.";
+        if (error instanceof IllegalArgumentException) return "إعداد الطلب غير صالح: " + safeDetail(error.getMessage());
+        return "فشل الاتصال (" + type + "): " + safeDetail(error.getMessage());
+    }
+
+    private String describeProviderFailure(RuncrateApi.ChatResult result) {
+        int status = result.httpStatus;
+        if (status == 401 || status == 403) return "رفض Runcrate المفتاح أو صلاحية الوصول (HTTP " + status + "). تأكد من المفتاح وأنه تابع لحساب GitHub المؤهل للمجاني.";
+        if (status == 404) return "لم يتعرف Runcrate على النموذج أو المسار (HTTP 404). النموذج المختار: " + selectedModelId();
+        if (status == 429) return "وصل الطلب إلى حد مؤقت لدى Runcrate (HTTP 429). انتظر قليلاً ثم أعد المحاولة.";
+        if (status >= 500) return "حدث عطل لدى خادم Runcrate (HTTP " + status + "). حاول لاحقاً.";
+        return "رفض Runcrate الطلب (HTTP " + status + ", " + safeDetail(result.errorCode) + "): " + safeDetail(result.errorMessage);
+    }
+
+    private String safeDetail(String value) {
+        if (value == null || value.trim().isEmpty()) return "لا توجد تفاصيل إضافية";
+        String safe = value.replaceAll("(?i)rc_live_[A-Za-z0-9_-]+", "[hidden]");
+        return safe.length() > 240 ? safe.substring(0, 240) : safe;
     }
 
     private JSONArray copyArray(JSONArray source) {
