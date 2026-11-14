@@ -35,3 +35,11 @@ jobs:
       - name: Build debug APK
         working-directory: 313-android
         run: gradle --no-daemon assembleDebug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: 313-debug-apk
+          path: 313-android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
