@@ -1,0 +1,94 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Termux:Boot entrypoint for 313. Safe to run repeatedly.
+set -u
+
+ROOT="$HOME/313-team"
+CONFIG="$HOME/.config/313/team.json"
+OMNI_KEY="$HOME/.omniroute-key"
+LOG_DIR="$ROOT/logs"
+mkdir -p "$ROOT" "$LOG_DIR"
+
+# Termux:Boot recommends this first so long-running services can stay alive.
+termux-wake-lock >/dev/null 2>&1 || true
+
+if [ ! -f "$CONFIG" ] || [ ! -f "$OMNI_KEY" ]; then
+  echo "313 boot: private config or OmniRoute key missing; see $LOG_DIR/boot.log"
+  exit 1
+fi
+
+export PATH="/data/data/com.termux/files/usr/bin:$PATH"
+
+omni_ready() {
+  python - <<'PY'
+import json
+from pathlib import Path
+from urllib.request import Request, urlopen
+try:
+    key = Path.home().joinpath(".omniroute-key").read_text().strip()
+    req = Request("http://127.0.0.1:20128/v1/models",
+                  headers={"Authorization": "Bearer " + key})
+    with urlopen(req, timeout=3) as r:
+        data = json.loads(r.read().decode())
+    raise SystemExit(0 if isinstance(data.get("data"), list) else 1)
+except Exception:
+    raise SystemExit(1)
+PY
+}
+
+gateway_ready() {
+  python - <<'PY'
+from urllib.request import urlopen
+try:
+    with urlopen("http://127.0.0.1:3131/health", timeout=3) as r:
+        raise SystemExit(0 if r.status == 200 else 1)
+except Exception:
+    raise SystemExit(1)
+PY
+}
+
+if ! omni_ready; then
+  if ! command -v omniroute >/dev/null 2>&1; then
+    echo "313 boot: omniroute command not found" >> "$LOG_DIR/boot.log"
+    exit 1
+  fi
+  nohup omniroute serve --port 20128 --no-open --headless \
+    >> "$LOG_DIR/omniroute.log" 2>&1 < /dev/null &
+fi
+
+for _ in $(seq 1 30); do
+  omni_ready && break
+  sleep 2
+done
+if ! omni_ready; then
+  echo "313 boot: OmniRoute did not become ready" >> "$LOG_DIR/boot.log"
+  exit 1
+fi
+
+if ! gateway_ready; then
+  if [ ! -f "$ROOT/313_team_server.py" ]; then
+    echo "313 boot: $ROOT/313_team_server.py missing" >> "$LOG_DIR/boot.log"
+    exit 1
+  fi
+  nohup python -u "$ROOT/313_team_server.py" \
+    >> "$LOG_DIR/server.log" 2>&1 < /dev/null &
+fi
+
+for _ in $(seq 1 20); do
+  gateway_ready && break
+  sleep 1
+done
+if ! gateway_ready; then
+  echo "313 boot: local gateway did not become ready" >> "$LOG_DIR/boot.log"
+  exit 1
+fi
+
+if ! pgrep -f '313_remote_worker[.]py' >/dev/null 2>&1; then
+  if [ ! -f "$ROOT/313_remote_worker.py" ]; then
+    echo "313 boot: $ROOT/313_remote_worker.py missing" >> "$LOG_DIR/boot.log"
+    exit 1
+  fi
+  nohup python -u "$ROOT/313_remote_worker.py" \
+    >> "$ROOT/remote-worker.log" 2>&1 < /dev/null &
+fi
+
+echo "313 boot: startup checks passed at $(date -Iseconds)" >> "$LOG_DIR/boot.log"
