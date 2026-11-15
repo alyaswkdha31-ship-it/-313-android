@@ -1,0 +1,5 @@
+# Local environment files and credentials
+.env
+integrations/chatgpt-onyx/**/.env
+**/onyx_token*
+**/*.secret
