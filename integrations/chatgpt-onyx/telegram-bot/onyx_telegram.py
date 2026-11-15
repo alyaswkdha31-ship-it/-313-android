@@ -36,6 +36,7 @@ gateway.headers.update({
 })
 TG_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 HTTP_TIMEOUT = 40
+JOB_TIMEOUT = 210
 
 
 def send_message(chat_id: str, text: str) -> None:
@@ -67,25 +68,34 @@ def api_json(response: requests.Response) -> dict[str, Any]:
     return data
 
 
-def submit_and_wait(job_type: str) -> dict[str, Any]:
+def submit_and_wait(user_text: str) -> dict[str, Any]:
+    if not user_text.strip() or len(user_text) > 12000:
+        raise RuntimeError("الرسالة فارغة أو أطول من الحد المسموح.")
+
     response = gateway.post(
         f"{ONYX_BASE}/v1/jobs",
-        json={"type": job_type},
+        json={
+            "type": "313.chat",
+            "payload": {
+                "messages": [{"role": "user", "content": user_text.strip()}]
+            },
+        },
         timeout=15,
     )
     envelope = api_json(response)
-    job = envelope.get("job")
-    if not envelope.get("ok") or not isinstance(job, dict) or not job.get("id"):
+    job_id = envelope.get("id")
+    if not envelope.get("ok") or not isinstance(job_id, str) or not job_id:
         raise RuntimeError("لم تُرجع البوابة رقم المهمة.")
-    job_id = str(job["id"])
-    deadline = time.monotonic() + 60
+
+    deadline = time.monotonic() + JOB_TIMEOUT
     while time.monotonic() < deadline:
         response = gateway.get(f"{ONYX_BASE}/v1/jobs/{job_id}", timeout=15)
         current_envelope = api_json(response)
         current = current_envelope.get("job")
         if not isinstance(current, dict):
             raise RuntimeError("بيانات المهمة غير صالحة.")
-        if current.get("status") in ("done", "error"):
+        status = current.get("status")
+        if status in ("done", "failed", "error"):
             return current
         time.sleep(2)
     return {"id": job_id, "status": "timeout"}
@@ -94,11 +104,14 @@ def submit_and_wait(job_type: str) -> dict[str, Any]:
 def format_result(job: dict[str, Any]) -> str:
     status = job.get("status")
     if status == "done":
-        return "اكتملت المهمة:\n" + str(job.get("result"))
-    if status == "error":
-        return "فشلت المهمة:\n" + str(job.get("error") or "سبب غير محدد")
+        result = job.get("result")
+        if isinstance(result, dict) and isinstance(result.get("answer"), str):
+            return result["answer"]
+        return "اكتملت المهمة، لكن لم يصل نص الرد المتوقع."
+    if status in ("failed", "error"):
+        return "تعذر تنفيذ الطلب:\n" + str(job.get("error") or "سبب غير محدد")
     if status == "timeout":
-        return "انتهت مهلة الانتظار (60 ثانية). رقم المهمة: " + str(job.get("id"))
+        return "انتهت مهلة انتظار رد 313. رقم المهمة: " + str(job.get("id"))
     return "حالة المهمة: " + str(status)
 
 
@@ -127,9 +140,8 @@ def main() -> None:
                 text = message.get("text")
                 if not isinstance(text, str) or not text.strip():
                     continue
-                job_type = text.strip()
                 try:
-                    job = submit_and_wait(job_type)
+                    job = submit_and_wait(text)
                     send_message(chat_id, format_result(job))
                 except (requests.RequestException, RuntimeError) as exc:
                     send_message(chat_id, "خطأ أثناء تنفيذ الطلب: " + str(exc))
