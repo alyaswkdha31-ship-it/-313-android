@@ -140,7 +140,6 @@ public class MainActivity extends Activity {
         addNavItem(nav, "♙", "إدارة 313", () -> startActivity(new Intent(this, TeamConsoleActivity.class)), false);
         addNavItem(nav, "⚙", "الخدمات", () -> showKeyDialog(true), false);
         addNavItem(nav, "▣", "الكاميرات", () -> showSectionNotice("الكاميرات", "واجهة القسم قيد الإكمال؛ لم يتم ربط بث كاميرا بعد."), false);
-        addNavItem(nav, "◷", "الصلاة", () -> showSectionNotice("مواقيت الصلاة", "ربط المواقيت لم يكتمل بعد."), false);
         addNavItem(nav, "⌁", "الراوتر", () -> showSectionNotice("الراوتر", "إعداد صفحة الراوتر غير مضاف في هذه النسخة."), false);
         addNavItem(nav, "▤", "ONYX TV", () -> showSectionNotice("تلفزيون ONYX", "التحكم بالتلفزيون يحتاج جسر الشبكة."), false);
         addNavItem(nav, "▥", "التقارير", () -> showSectionNotice("التقارير", "قسم التقارير قيد الإكمال."), false);
