@@ -1,0 +1,55 @@
+name: Android build
+
+on:
+  push:
+    branches:
+      - main
+      - feature/runcrate-free-only
+      - feature/313-termux-agent-team
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Test Termux team gateway policy
+        working-directory: 313-android
+        run: python -m unittest discover -s termux -p 'test_*.py'
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build debug APK
+        working-directory: 313-android
+        run: gradle --no-daemon assembleDebug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: 313-debug-apk
+          path: 313-android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
