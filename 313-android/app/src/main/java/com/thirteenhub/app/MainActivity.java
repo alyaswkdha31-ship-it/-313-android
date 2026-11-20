@@ -506,6 +506,12 @@ public class MainActivity extends Activity {
             if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(service);
             else startService(service);
             Toast.makeText(this, "بدأت خدمة يا إيلاف. اترك إشعارها ظاهراً.", Toast.LENGTH_LONG).show();
+            // Android 13+ requires a runtime notification permission. The listener
+            // can still run if it is denied, but its persistent notification may be hidden.
+            if (android.os.Build.VERSION.SDK_INT >= 33
+                    && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 315);
+            }
         } catch (Exception e) {
             Toast.makeText(this, "تعذر تشغيل خدمة يا إيلاف: " + safeDetail(e.getMessage()), Toast.LENGTH_LONG).show();
         }
@@ -585,6 +591,10 @@ public class MainActivity extends Activity {
                 toggleElafWakeService();
             } else {
                 Toast.makeText(this, "يلزم السماح بالميكروفون لتشغيل يا إيلاف", Toast.LENGTH_LONG).show();
+            }
+        } else if (requestCode == 315) {
+            if (grantResults.length == 0 || grantResults[0] != PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(this, "الاستماع يعمل، لكن قد لا يظهر إشعار يا إيلاف. فعّل الإشعارات من إعدادات التطبيق لإظهار زر الإيقاف.", Toast.LENGTH_LONG).show();
             }
         }
     }
