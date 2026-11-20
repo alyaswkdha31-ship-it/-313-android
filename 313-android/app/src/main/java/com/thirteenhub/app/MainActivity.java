@@ -348,6 +348,7 @@ public class MainActivity extends Activity {
     }
 
     private void restoreHistory() {
+        messagesBox.removeAllViews();
         SharedPreferences prefs = getSharedPreferences("elafyas_chat", MODE_PRIVATE);
         String saved = prefs.getString("messages", "[]");
         try {
@@ -440,6 +441,7 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) { }
 
         sending = true;
+        final int loadingStart = messagesBox.getChildCount();
         addBubble("جاري الاتصال بالموجّه المجاني...", false);
         final JSONArray requestHistory = copyArray(history);
         worker.execute(() -> {
@@ -455,7 +457,9 @@ public class MainActivity extends Activity {
             final String error = failure;
             mainHandler.post(() -> {
                 sending = false;
-                if (messagesBox.getChildCount() > 0) messagesBox.removeViewAt(messagesBox.getChildCount() - 1);
+                while (messagesBox.getChildCount() > loadingStart) {
+                    messagesBox.removeViewAt(messagesBox.getChildCount() - 1);
+                }
                 if (response != null) {
                     addBubble(response, false);
                     try {
