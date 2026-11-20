@@ -229,7 +229,7 @@ public class MainActivity extends Activity {
 
     private void addNavItem(LinearLayout nav, String icon, String title, Runnable action, boolean selected) {
         Button item = new Button(this);
-        item.setText(icon + "\\n" + title);
+        item.setText(icon + "\n" + title);
         item.setTextSize(9);
         item.setTextColor(selected ? Color.WHITE : Color.rgb(205, 220, 245));
         item.setAllCaps(false);
@@ -242,7 +242,7 @@ public class MainActivity extends Activity {
     }
 
     private Button actionChip(String icon, String title, Runnable action) {
-        Button b = button(icon + "\\n" + title, false);
+        Button b = button(icon + "\n" + title, false);
         b.setTextSize(9);
         b.setOnClickListener(v -> action.run());
         return b;
@@ -276,7 +276,7 @@ public class MainActivity extends Activity {
         TextView welcome = label("🦅  أهلاً بك في مركز قيادة إيلاف", 17, Color.WHITE, true);
         welcome.setGravity(Gravity.CENTER);
         messagesBox.addView(welcome, withMargins(-1, dp(58), 0, dp(48), 0, dp(8)));
-        TextView hint = label("ONYX CONTROL  ×  313 AI TEAM\\nابدأ المحادثة مع العقل المركزي. النماذج المجانية فقط.", 12, muted, false);
+        TextView hint = label("ONYX CONTROL  ×  313 AI TEAM\nابدأ المحادثة مع العقل المركزي. النماذج المجانية فقط.", 12, muted, false);
         hint.setGravity(Gravity.CENTER);
         hint.setPadding(dp(18), 0, dp(18), 0);
         messagesBox.addView(hint, lp(-1, -2));
