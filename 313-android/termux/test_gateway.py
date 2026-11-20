@@ -12,29 +12,28 @@ class GatewayPolicyTests(unittest.TestCase):
     def test_loopback_binding_only(self):
         self.assertEqual(gateway.HOST, "127.0.0.1")
 
-    def test_openrouter_free_router_is_the_only_default_target(self):
-        self.assertEqual(gateway.OPENROUTER_URL, "https://openrouter.ai/api/v1/chat/completions")
+    def test_local_omniroute_is_the_only_configured_inference_gateway(self):
+        self.assertEqual(gateway.OMNIROUTE_DEFAULT_URL, "http://127.0.0.1:20128")
         source = MODULE.read_text(encoding="utf-8")
-        self.assertIn('"model": "openrouter/free"', source)
-        self.assertNotIn('"models": [', source)
+        self.assertIn('config["omniroute_model"]', source)
+        self.assertNotIn("openrouter.ai/api/v1/chat/completions", source)
+        self.assertNotIn("api.runcrate.ai", source)
 
-    def test_no_paid_fallback_flag_in_saved_status(self):
+    def test_strict_free_gate_fails_closed(self):
+        source = MODULE.read_text(encoding="utf-8")
+        self.assertIn("def require_strict_free(config):", source)
+        self.assertIn('config.get("omniroute_strict_free_confirmed") is not True', source)
+        self.assertIn("require_strict_free(config)", source)
+
+    def test_no_paid_fallback(self):
         source = MODULE.read_text(encoding="utf-8")
         self.assertIn('"paid_fallback": False', source)
+        self.assertIn("if cost_value is not None and cost_value > 0:", source)
 
-    def test_main_chat_uses_only_free_router(self):
+    def test_diagnostics_do_not_claim_completion_was_tested(self):
         source = MODULE.read_text(encoding="utf-8")
-        self.assertIn('if self.path not in ("/api/team/review", "/api/chat")', source)
-        self.assertIn('"model": "openrouter/free"', source)
-        self.assertIn('def chat_completion(config, messages):', source)
-
-    def test_diagnostics_validate_both_providers(self):
-        source = MODULE.read_text(encoding="utf-8")
-        self.assertIn('OPENROUTER_KEY_URL = "https://openrouter.ai/api/v1/key"', source)
-        self.assertIn('def provider_diagnostics(config):', source)
-        self.assertIn('"/api/diagnostics"', source)
-        self.assertIn('"github_ok"', source)
-        self.assertIn('"openrouter_ok"', source)
+        self.assertIn('result["model_completion_tested"] = False', source)
+        self.assertIn('result["omniroute_ok"]', source)
 
     def test_secret_paths_are_excluded(self):
         self.assertIsNotNone(gateway.SECRET_NAME.search(".env"))
