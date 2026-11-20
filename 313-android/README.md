@@ -1,21 +1,21 @@
-# 313 Android
+# مركز قيادة إيلاف
 
-Initial Android MVP for the 313 AI command-center app.
+This branch integrates the existing native 313 Android application with the ONYX CONTROL dashboard.
 
-## Current milestone
-- Native Android app shell (Java, no third-party runtime dependencies)
-- Arabic RTL dark dashboard
-- Entry cards for ChatGPT, Claude, Gemini, GitHub, and Codex
-- Opens each official service in the device browser
-
-## Not yet implemented
-Direct API/OAuth integrations, secure credential storage, project sync, agent orchestration, and Codex execution. These require separate authentication and backend work; this first milestone intentionally does not collect or embed API keys.
+## Included
+- Existing 313 native chat and project Team Console.
+- Arabic speech input and copy-to-clipboard controls from the 313 app.
+- Existing Termux loopback gateway integration and encrypted Android gateway-token storage.
+- Strict zero-cost OmniRoute policy gate: AI requests remain blocked unless strict free-access mode is confirmed; no paid fallback is allowed.
+- ONYX CONTROL opens in a dedicated in-app WebView activity from the 313 home screen.
+- Launcher display name: مركز قيادة إيلاف.
+- Solar-energy features are intentionally excluded.
 
 ## Build
-Requires JDK 17+, Android SDK 35, and Gradle 8.7-compatible Android Gradle Plugin 8.6.1.
+The GitHub Actions workflow builds the existing Android project at `313-android/` and uploads a debug APK artifact named `elafyas-command-center-debug-apk`.
 
-```bash
-gradle assembleDebug
-```
-
-APK: `app/build/outputs/apk/debug/app-debug.apk`
+## Current limitations
+- The hosted ONYX CONTROL preview needs an internet connection and its own sign-in.
+- Android/Termux loopback connectivity has not yet been tested on the user's physical phone.
+- Camera cart workflow and prayer-times integration are not implemented in this branch yet.
+- A successful CI APK build is not equivalent to a physical-device install/runtime test.
