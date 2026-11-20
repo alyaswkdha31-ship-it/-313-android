@@ -1,9 +1,9 @@
 name: Build ElafYas Android APK
 on:
   push:
-    branches: [feature/elafyas-command-center-apk]
+    branches: [feature/elafyas-command-center-apk, feature/ya-elaf-voice-wake-service]
   pull_request:
-    branches: [feature/313-voice-copy-chat]
+    branches: [feature/313-voice-copy-chat, feature/elafyas-command-center-apk]
   workflow_dispatch:
 permissions:
   contents: read
