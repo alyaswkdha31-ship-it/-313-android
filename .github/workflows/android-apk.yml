@@ -1,9 +1,9 @@
-name: Build Android APK
+name: Build ElafYas Android APK
 on:
   push:
     branches: [feature/elafyas-command-center-apk]
   pull_request:
-    branches: [main]
+    branches: [feature/313-voice-copy-chat]
   workflow_dispatch:
 permissions:
   contents: read
@@ -16,21 +16,21 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Install Android SDK packages
-        shell: bash
-        run: |
-          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT}}"
-          SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | sort | tail -n 1)"
-          yes | "$SDKMANAGER" --licenses
-          "$SDKMANAGER" --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: |
+            platform-tools
+            platforms;android-35
+            build-tools;35.0.0
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
-      - name: Build debug APK
+      - name: Build existing 313 Android app
+        working-directory: 313-android
         run: gradle --no-daemon assembleDebug
       - uses: actions/upload-artifact@v4
         with:
           name: elafyas-command-center-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: 313-android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
