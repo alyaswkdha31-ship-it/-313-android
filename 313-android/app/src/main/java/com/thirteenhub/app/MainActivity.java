@@ -96,79 +96,119 @@ public class MainActivity extends Activity {
     private void buildChat() {
         root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(16), dp(12), dp(16), dp(12));
-        root.setBackgroundColor(bg);
+        root.setPadding(dp(8), dp(8), dp(8), dp(8));
+        root.setBackgroundColor(Color.rgb(3, 10, 25));
         setContentView(root);
 
+        // Header inspired by the supplied ONYX CONTROL command-center reference.
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setOrientation(LinearLayout.HORIZONTAL);
-        TextView brand = label("313", 25, Color.WHITE, true);
-        brand.setGravity(Gravity.CENTER);
-        header.addView(brand, lp(58, dp(48)));
-
+        header.setPadding(dp(8), dp(5), dp(8), dp(9));
+        header.setBackground(shape(Color.rgb(5, 18, 43), Color.rgb(0, 105, 255)));
+        TextView menuMark = label("☰", 25, Color.WHITE, true);
+        menuMark.setGravity(Gravity.CENTER);
+        header.addView(menuMark, lp(dp(42), dp(54)));
+        TextView eagle = label("🦅", 34, Color.WHITE, true);
+        eagle.setGravity(Gravity.CENTER);
+        header.addView(eagle, lp(dp(52), dp(54)));
         LinearLayout heading = new LinearLayout(this);
         heading.setOrientation(LinearLayout.VERTICAL);
-        TextView title = label("مركز قيادة إيلاف", 16, Color.WHITE, true);
-        TextView subtitle = label("نماذج مجانية فقط • بدون تحويل مدفوع", 11, muted, false);
+        TextView title = label("مركز قيادة إيلاف", 19, Color.WHITE, true);
+        TextView subtitle = label("ONYX CONTROL  ×  313 AI TEAM", 10, Color.rgb(165, 205, 255), true);
         heading.addView(title, lp(-1, -2));
         heading.addView(subtitle, lp(-1, -2));
         header.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView connect = label("☁\nONYX CONNECT", 10, Color.rgb(57, 196, 255), true);
+        connect.setGravity(Gravity.CENTER);
+        connect.setBackground(shape(Color.rgb(5, 31, 72), Color.rgb(0, 116, 255)));
+        header.addView(connect, lp(dp(82), dp(52)));
+        root.addView(header, withMargins(-1, -2, 0, 0, 0, dp(8)));
 
-        Button settings = button("⚙", false);
-        settings.setOnClickListener(v -> showKeyDialog(true));
-        header.addView(settings, lp(dp(48), dp(44)));
-        root.addView(header, lp(-1, -2));
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.HORIZONTAL);
+        root.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
+
+        // Compact icon rail keeps the layout usable on real phone screens.
+        LinearLayout nav = new LinearLayout(this);
+        nav.setOrientation(LinearLayout.VERTICAL);
+        nav.setPadding(dp(2), dp(4), dp(2), dp(4));
+        nav.setBackground(shape(Color.rgb(8, 24, 52), Color.rgb(26, 72, 133)));
+        body.addView(nav, lp(dp(78), -1));
+        addNavItem(nav, "▣", "المحادثة", () -> chatScroll.fullScroll(View.FOCUS_DOWN), true);
+        addNavItem(nav, "▦", "التحكم", () -> startActivity(new Intent(this, OnyxControlActivity.class)), false);
+        addNavItem(nav, "♙", "إدارة 313", () -> startActivity(new Intent(this, TeamConsoleActivity.class)), false);
+        addNavItem(nav, "⚙", "الخدمات", () -> showKeyDialog(true), false);
+        addNavItem(nav, "▣", "الكاميرات", () -> showSectionNotice("الكاميرات", "واجهة القسم قيد الإكمال؛ لم يتم ربط بث كاميرا بعد."), false);
+        addNavItem(nav, "◷", "الصلاة", () -> showSectionNotice("مواقيت الصلاة", "ربط المواقيت لم يكتمل بعد."), false);
+        addNavItem(nav, "⌁", "الراوتر", () -> showSectionNotice("الراوتر", "إعداد صفحة الراوتر غير مضاف في هذه النسخة."), false);
+        addNavItem(nav, "▤", "ONYX TV", () -> showSectionNotice("تلفزيون ONYX", "التحكم بالتلفزيون يحتاج جسر الشبكة."), false);
+        addNavItem(nav, "▥", "التقارير", () -> showSectionNotice("التقارير", "قسم التقارير قيد الإكمال."), false);
+        addNavItem(nav, "⬡", "الأمان", () -> showSectionNotice("الأمان", "إعدادات الأمان قيد الإكمال."), false);
+        addNavItem(nav, "⚙", "الإعدادات", () -> showKeyDialog(true), false);
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(7), 0, 0, 0);
+        body.addView(content, new LinearLayout.LayoutParams(0, -1, 1));
+
+        LinearLayout statusCard = new LinearLayout(this);
+        statusCard.setOrientation(LinearLayout.VERTICAL);
+        statusCard.setPadding(dp(10), dp(7), dp(10), dp(7));
+        statusCard.setBackground(shape(Color.rgb(7, 22, 46), Color.rgb(22, 74, 135)));
+        TextView statusTitle = label("🟢  محادثة 313 الذكية", 15, Color.WHITE, true);
+        TextView statusSub = label("أونكس - العقل المركزي", 11, Color.rgb(176, 198, 230), false);
+        statusCard.addView(statusTitle, lp(-1, -2));
+        statusCard.addView(statusSub, lp(-1, -2));
+        content.addView(statusCard, withMargins(-1, -2, 0, 0, 0, dp(6)));
 
         LinearLayout modelRow = new LinearLayout(this);
         modelRow.setGravity(Gravity.CENTER_VERTICAL);
-        modelRow.setPadding(dp(10), dp(4), dp(10), dp(4));
-        modelRow.setBackground(shape(panel, Color.rgb(43, 49, 70)));
-        TextView modelLabel = label("النموذج", 12, muted, true);
-        modelRow.addView(modelLabel, lp(dp(62), dp(42)));
+        modelRow.setPadding(dp(8), dp(2), dp(8), dp(2));
+        modelRow.setBackground(shape(Color.rgb(10, 28, 58), Color.rgb(30, 76, 135)));
+        TextView modelLabel = label("النموذج", 11, muted, true);
+        modelRow.addView(modelLabel, lp(dp(48), dp(38)));
         modelPicker = new Spinner(this);
-        String[] names = new String[]{"OpenRouter Free Router • تلقائي"};
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_item, names);
+        String[] names = new String[]{"✨ OmniRoute • مجاني فقط"};
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, names);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         modelPicker.setAdapter(adapter);
-        modelRow.addView(modelPicker, new LinearLayout.LayoutParams(0, dp(44), 1));
-        root.addView(modelRow, withMargins(-1, -2, 0, dp(10), 0, dp(10)));
+        modelRow.addView(modelPicker, new LinearLayout.LayoutParams(0, dp(38), 1));
+        content.addView(modelRow, withMargins(-1, -2, 0, 0, 0, dp(5)));
 
-        connectionStatus = label("", 11, muted, false);
-        root.addView(connectionStatus, withMargins(-1, -2, dp(4), 0, dp(4), dp(6)));
-
-        Button teamButton = button("فريق المشاريع", true);
-        teamButton.setOnClickListener(v -> startActivity(new Intent(this, TeamConsoleActivity.class)));
-        root.addView(teamButton, withMargins(-1, -2, 0, 0, 0, dp(8)));
-
-        Button onyxButton = button("فتح ONYX CONTROL", true);
-        onyxButton.setContentDescription("فتح لوحة تحكم ONYX");
-        onyxButton.setOnClickListener(v -> startActivity(new Intent(this, OnyxControlActivity.class)));
-        root.addView(onyxButton, withMargins(-1, -2, 0, 0, 0, dp(8)));
+        connectionStatus = label("", 10, muted, false);
+        connectionStatus.setPadding(dp(4), 0, dp(4), 0);
+        content.addView(connectionStatus, withMargins(-1, -2, 0, 0, 0, dp(4)));
 
         chatScroll = new ScrollView(this);
         chatScroll.setFillViewport(true);
         messagesBox = new LinearLayout(this);
         messagesBox.setOrientation(LinearLayout.VERTICAL);
-        messagesBox.setPadding(0, dp(8), 0, dp(12));
+        messagesBox.setPadding(dp(2), dp(8), dp(2), dp(8));
         chatScroll.addView(messagesBox, new ScrollView.LayoutParams(-1, -2));
-        root.addView(chatScroll, new LinearLayout.LayoutParams(-1, 0, 1));
-
+        content.addView(chatScroll, new LinearLayout.LayoutParams(-1, 0, 1));
         addWelcome();
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setGravity(Gravity.CENTER);
+        actions.setPadding(0, dp(4), 0, dp(4));
+        actions.addView(actionChip("📷", "كاميرا", () -> showSectionNotice("الكاميرا", "التقاط الصور يحتاج إكمال ربط الكاميرا.")), new LinearLayout.LayoutParams(0, dp(48), 1));
+        actions.addView(actionChip("▧", "معرض", () -> showSectionNotice("المعرض", "اختيار الصور وإرسالها غير مفعّل في هذه النسخة.")), new LinearLayout.LayoutParams(0, dp(48), 1));
+        actions.addView(actionChip("🎙", "تسجيل صوتي", this::startVoiceInput), new LinearLayout.LayoutParams(0, dp(48), 1));
+        actions.addView(actionChip("▢", "نسخ", () -> copyText(composer.getText().toString())), new LinearLayout.LayoutParams(0, dp(48), 1));
+        content.addView(actions, withMargins(-1, -2, 0, dp(2), 0, dp(4)));
 
         LinearLayout composerPanel = new LinearLayout(this);
         composerPanel.setOrientation(LinearLayout.HORIZONTAL);
-        composerPanel.setGravity(Gravity.BOTTOM);
-        composerPanel.setPadding(dp(8), dp(6), dp(8), dp(6));
-        composerPanel.setBackground(shape(panel, Color.rgb(48, 54, 76)));
+        composerPanel.setGravity(Gravity.CENTER_VERTICAL);
+        composerPanel.setPadding(dp(7), dp(5), dp(7), dp(5));
+        composerPanel.setBackground(shape(Color.rgb(7, 25, 58), Color.rgb(0, 105, 255)));
         composer = new EditText(this);
         composer.setTextColor(Color.WHITE);
         composer.setHintTextColor(muted);
         composer.setHint("اكتب رسالتك هنا...");
-        composer.setTextSize(14);
+        composer.setTextSize(13);
         composer.setSingleLine(false);
-        composer.setMaxLines(4);
+        composer.setMaxLines(3);
         composer.setMinLines(1);
         composer.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
         composer.setImeOptions(EditorInfo.IME_ACTION_SEND);
@@ -180,14 +220,37 @@ public class MainActivity extends Activity {
             return false;
         });
         composerPanel.addView(composer, new LinearLayout.LayoutParams(0, -2, 1));
-        micButton = button("🎙", false);
-        micButton.setContentDescription("إملاء صوتي");
-        micButton.setOnClickListener(v -> startVoiceInput());
-        composerPanel.addView(micButton, lp(dp(48), dp(46)));
-        Button send = button("إرسال", true);
+        Button send = button("➤", true);
+        send.setTextSize(20);
         send.setOnClickListener(v -> sendMessage());
-        composerPanel.addView(send, lp(dp(76), dp(46)));
-        root.addView(composerPanel, withMargins(-1, -2, 0, dp(8), 0, 0));
+        composerPanel.addView(send, lp(dp(48), dp(46)));
+        content.addView(composerPanel, lp(-1, -2));
+    }
+
+    private void addNavItem(LinearLayout nav, String icon, String title, Runnable action, boolean selected) {
+        Button item = new Button(this);
+        item.setText(icon + "\\n" + title);
+        item.setTextSize(9);
+        item.setTextColor(selected ? Color.WHITE : Color.rgb(205, 220, 245));
+        item.setAllCaps(false);
+        item.setMinHeight(0);
+        item.setPadding(dp(1), dp(2), dp(1), dp(2));
+        item.setBackground(shape(selected ? Color.rgb(0, 75, 190) : Color.rgb(8, 24, 52),
+                selected ? Color.rgb(0, 139, 255) : Color.rgb(24, 55, 96)));
+        item.setOnClickListener(v -> action.run());
+        nav.addView(item, withMargins(-1, dp(51), 0, dp(2), 0, dp(3)));
+    }
+
+    private Button actionChip(String icon, String title, Runnable action) {
+        Button b = button(icon + "\\n" + title, false);
+        b.setTextSize(9);
+        b.setOnClickListener(v -> action.run());
+        return b;
+    }
+
+    private void showSectionNotice(String title, String message) {
+        new AlertDialog.Builder(this).setTitle(title).setMessage(message)
+                .setPositiveButton("حسناً", null).show();
     }
 
     private LinearLayout.LayoutParams withMargins(int w, int h, int l, int t, int r, int b) {
@@ -202,16 +265,18 @@ public class MainActivity extends Activity {
         b.setTextSize(12);
         b.setTextColor(Color.WHITE);
         b.setAllCaps(false);
-        b.setBackground(shape(primary ? Color.rgb(105, 78, 180) : panel,
-                primary ? 0 : Color.rgb(55, 61, 82)));
+        b.setMinHeight(0);
+        b.setPadding(dp(4), dp(2), dp(4), dp(2));
+        b.setBackground(shape(primary ? Color.rgb(0, 91, 230) : Color.rgb(12, 32, 66),
+                primary ? Color.rgb(0, 145, 255) : Color.rgb(35, 75, 130)));
         return b;
     }
 
     private void addWelcome() {
-        TextView welcome = label("أهلاً بك في 313", 21, Color.WHITE, true);
+        TextView welcome = label("🦅  أهلاً بك في مركز قيادة إيلاف", 17, Color.WHITE, true);
         welcome.setGravity(Gravity.CENTER);
         messagesBox.addView(welcome, withMargins(-1, dp(58), 0, dp(48), 0, dp(8)));
-        TextView hint = label("ابدأ محادثتك مباشرة. اختر نموذجاً مجانياً من القائمة، واكتب سؤالك بالأسفل.", 14, muted, false);
+        TextView hint = label("ONYX CONTROL  ×  313 AI TEAM\\nابدأ المحادثة مع العقل المركزي. النماذج المجانية فقط.", 12, muted, false);
         hint.setGravity(Gravity.CENTER);
         hint.setPadding(dp(18), 0, dp(18), 0);
         messagesBox.addView(hint, lp(-1, -2));
