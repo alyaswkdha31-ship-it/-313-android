@@ -143,6 +143,8 @@ public final class ElafWakeService extends Service {
                         String command = removeWakeWord(heard);
                         if (command.trim().length() > 2) {
                             awaitingCommand = true;
+                            try { if (recognizer != null) recognizer.cancel(); } catch (Exception ignored) { }
+                            listening = false;
                             handleRecognized(heard);
                         } else {
                             awaitingCommand = true;
