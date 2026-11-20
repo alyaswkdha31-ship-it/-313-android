@@ -1,6 +1,13 @@
 package com.thirteenhub.app;
 
 import android.app.Activity;
+import android.Manifest;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.pm.PackageManager;
+import android.speech.RecognitionListener;
+import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
 import android.app.AlertDialog;
 import android.os.Bundle;
 import android.os.Handler;
@@ -29,6 +36,7 @@ import org.json.JSONObject;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.ArrayList;
 
 public class MainActivity extends Activity {
     private final int bg = Color.rgb(9, 11, 20);
@@ -45,6 +53,9 @@ public class MainActivity extends Activity {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private boolean sending = false;
+    private SpeechRecognizer speechRecognizer;
+    private Button micButton;
+    private static final int AUDIO_PERMISSION_REQUEST = 313;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -164,6 +175,10 @@ public class MainActivity extends Activity {
             return false;
         });
         composerPanel.addView(composer, new LinearLayout.LayoutParams(0, -2, 1));
+        micButton = button("🎙", false);
+        micButton.setContentDescription("إملاء صوتي");
+        micButton.setOnClickListener(v -> startVoiceInput());
+        composerPanel.addView(micButton, lp(dp(48), dp(46)));
         Button send = button("إرسال", true);
         send.setOnClickListener(v -> sendMessage());
         composerPanel.addView(send, lp(dp(76), dp(46)));
@@ -208,6 +223,15 @@ public class MainActivity extends Activity {
         line.addView(bubble, new LinearLayout.LayoutParams(-2, -2));
         LinearLayout.LayoutParams p = withMargins(-1, -2, 0, dp(5), 0, dp(9));
         messagesBox.addView(line, p);
+        if (!user) {
+            Button copy = button("نسخ", false);
+            copy.setTextSize(11);
+            copy.setOnClickListener(v -> copyText(text));
+            LinearLayout copyLine = new LinearLayout(this);
+            copyLine.setGravity(Gravity.LEFT);
+            copyLine.addView(copy, lp(dp(64), dp(34)));
+            messagesBox.addView(copyLine, withMargins(-1, -2, 0, 0, 0, dp(8)));
+        }
         chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
     }
 
@@ -316,6 +340,82 @@ public class MainActivity extends Activity {
                 .hideSoftInputFromWindow(composer.getWindowToken(), 0);
     }
 
+
+    private void copyText(String value) {
+        ClipboardManager clipboard = (ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+        if (clipboard == null) {
+            Toast.makeText(this, "تعذر الوصول إلى الحافظة", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        clipboard.setPrimaryClip(ClipData.newPlainText("313 reply", value));
+        Toast.makeText(this, "تم النسخ", Toast.LENGTH_SHORT).show();
+    }
+
+    private void startVoiceInput() {
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            Toast.makeText(this, "خدمة الإملاء الصوتي غير متاحة على الجهاز", Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, AUDIO_PERMISSION_REQUEST);
+            return;
+        }
+        try {
+            if (speechRecognizer != null) speechRecognizer.destroy();
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
+            speechRecognizer.setRecognitionListener(new RecognitionListener() {
+                @Override public void onReadyForSpeech(Bundle params) {
+                    if (micButton != null) micButton.setText("●");
+                }
+                @Override public void onBeginningOfSpeech() { }
+                @Override public void onRmsChanged(float rmsdB) { }
+                @Override public void onBufferReceived(byte[] buffer) { }
+                @Override public void onEndOfSpeech() {
+                    if (micButton != null) micButton.setText("🎙");
+                }
+                @Override public void onError(int error) {
+                    if (micButton != null) micButton.setText("🎙");
+                    if (error != SpeechRecognizer.ERROR_NO_MATCH && error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
+                        Toast.makeText(MainActivity.this, "تعذر فهم الصوت، حاول مرة أخرى", Toast.LENGTH_SHORT).show();
+                    }
+                }
+                @Override public void onResults(Bundle results) {
+                    if (micButton != null) micButton.setText("🎙");
+                    ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                    if (matches != null && !matches.isEmpty()) {
+                        String current = composer.getText().toString().trim();
+                        String recognized = matches.get(0).trim();
+                        composer.setText(current.isEmpty() ? recognized : current + " " + recognized);
+                        composer.setSelection(composer.getText().length());
+                    }
+                }
+                @Override public void onPartialResults(Bundle partialResults) { }
+                @Override public void onEvent(int eventType, Bundle params) { }
+            });
+            Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ar-IQ");
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "ar-IQ");
+            intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false);
+            speechRecognizer.startListening(intent);
+            Toast.makeText(this, "تحدث الآن", Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            if (micButton != null) micButton.setText("🎙");
+            Toast.makeText(this, "تعذر بدء المايكروفون", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == AUDIO_PERMISSION_REQUEST) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                startVoiceInput();
+            } else {
+                Toast.makeText(this, "اسمح باستخدام المايكروفون لتفعيل الإملاء الصوتي", Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
     private String describeLocalFailure(Exception error) {
         String message = error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
         String lower = message.toLowerCase();
@@ -344,6 +444,7 @@ public class MainActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
+        if (speechRecognizer != null) { speechRecognizer.destroy(); speechRecognizer = null; }
         worker.shutdownNow();
         super.onDestroy();
     }
