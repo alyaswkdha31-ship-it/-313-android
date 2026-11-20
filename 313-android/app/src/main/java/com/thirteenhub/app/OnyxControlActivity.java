@@ -40,7 +40,23 @@ public final class OnyxControlActivity extends Activity {
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
         settings.setMediaPlaybackRequiresUserGesture(false);
-        web.setWebViewClient(new WebViewClient());
+        web.setWebViewClient(new WebViewClient() {
+            @Override public boolean shouldOverrideUrlLoading(WebView view, android.webkit.WebResourceRequest request) {
+                android.net.Uri uri = request.getUrl();
+                boolean trusted = uri != null && "https".equals(uri.getScheme())
+                    && "onyx-control-git-feature-313-chat-mic-b3e0cd-alyaswkdha31-8088.vercel.app".equals(uri.getHost());
+                if (!trusted) {
+                    view.removeJavascriptInterface("onyxNativeSpeech");
+                    Toast.makeText(OnyxControlActivity.this, "تم حظر الانتقال إلى نطاق غير موثوق", Toast.LENGTH_SHORT).show();
+                    return true;
+                }
+                return false;
+            }
+            @Override public void onReceivedSslError(WebView view, android.webkit.SslErrorHandler handler,
+                                                       android.net.http.SslError error) {
+                handler.cancel();
+            }
+        });
         web.addJavascriptInterface(new NativeSpeechBridge(), "onyxNativeSpeech");
         web.setWebChromeClient(new WebChromeClient() {
             @Override public void onPermissionRequest(PermissionRequest request) {
