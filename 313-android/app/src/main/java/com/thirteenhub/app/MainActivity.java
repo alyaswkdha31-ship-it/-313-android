@@ -55,6 +55,7 @@ public class MainActivity extends Activity {
     private boolean sending = false;
     private SpeechRecognizer speechRecognizer;
     private Button micButton;
+    private boolean nativeListening = false;
     private static final int AUDIO_PERMISSION_REQUEST = 313;
 
     @Override public void onCreate(Bundle state) {
@@ -193,7 +194,8 @@ public class MainActivity extends Activity {
         actions.setPadding(0, dp(4), 0, dp(4));
         actions.addView(actionChip("📷", "كاميرا", () -> showSectionNotice("الكاميرا", "التقاط الصور يحتاج إكمال ربط الكاميرا.")), new LinearLayout.LayoutParams(0, dp(48), 1));
         actions.addView(actionChip("▧", "معرض", () -> showSectionNotice("المعرض", "اختيار الصور وإرسالها غير مفعّل في هذه النسخة.")), new LinearLayout.LayoutParams(0, dp(48), 1));
-        actions.addView(actionChip("🎙", "تسجيل صوتي", this::startVoiceInput), new LinearLayout.LayoutParams(0, dp(48), 1));
+        micButton = actionChip("🎙", "تسجيل صوتي", this::startVoiceInput);
+        actions.addView(micButton, new LinearLayout.LayoutParams(0, dp(48), 1));
         actions.addView(actionChip("▢", "نسخ", () -> copyText(composer.getText().toString())), new LinearLayout.LayoutParams(0, dp(48), 1));
         content.addView(actions, withMargins(-1, -2, 0, dp(2), 0, dp(4)));
 
@@ -422,6 +424,12 @@ public class MainActivity extends Activity {
     }
 
     private void startVoiceInput() {
+        if (nativeListening && speechRecognizer != null) {
+            try { speechRecognizer.stopListening(); } catch (Exception ignored) { }
+            nativeListening = false;
+            if (micButton != null) micButton.setText("🎙\\nتسجيل صوتي");
+            return;
+        }
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
             Toast.makeText(this, "خدمة الإملاء الصوتي غير متاحة على الجهاز", Toast.LENGTH_LONG).show();
             return;
@@ -435,22 +443,23 @@ public class MainActivity extends Activity {
             speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
             speechRecognizer.setRecognitionListener(new RecognitionListener() {
                 @Override public void onReadyForSpeech(Bundle params) {
-                    if (micButton != null) micButton.setText("●");
+                    nativeListening = true;
+                    if (micButton != null) micButton.setText("⏹\\nإيقاف التسجيل");
                 }
                 @Override public void onBeginningOfSpeech() { }
                 @Override public void onRmsChanged(float rmsdB) { }
                 @Override public void onBufferReceived(byte[] buffer) { }
-                @Override public void onEndOfSpeech() {
-                    if (micButton != null) micButton.setText("🎙");
-                }
+                @Override public void onEndOfSpeech() { }
                 @Override public void onError(int error) {
-                    if (micButton != null) micButton.setText("🎙");
+                    nativeListening = false;
+                    if (micButton != null) micButton.setText("🎙\\nتسجيل صوتي");
                     if (error != SpeechRecognizer.ERROR_NO_MATCH && error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
                         Toast.makeText(MainActivity.this, "تعذر فهم الصوت، حاول مرة أخرى", Toast.LENGTH_SHORT).show();
                     }
                 }
                 @Override public void onResults(Bundle results) {
-                    if (micButton != null) micButton.setText("🎙");
+                    nativeListening = false;
+                    if (micButton != null) micButton.setText("🎙\\nتسجيل صوتي");
                     ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                     if (matches != null && !matches.isEmpty()) {
                         String current = composer.getText().toString().trim();
@@ -470,7 +479,8 @@ public class MainActivity extends Activity {
             speechRecognizer.startListening(intent);
             Toast.makeText(this, "تحدث الآن", Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
-            if (micButton != null) micButton.setText("🎙");
+            nativeListening = false;
+            if (micButton != null) micButton.setText("🎙\\nتسجيل صوتي");
             Toast.makeText(this, "تعذر بدء المايكروفون", Toast.LENGTH_SHORT).show();
         }
     }
