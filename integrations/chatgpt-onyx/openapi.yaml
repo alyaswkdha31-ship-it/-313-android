@@ -1,0 +1,134 @@
+openapi: 3.1.0
+info:
+  title: ONYX CONNECT Jobs API
+  version: 1.0.0
+  description: Submit jobs to the existing ONYX CONNECT gateway and retrieve their status.
+servers:
+  - url: https://onyx-connect.alyaswkdha31.workers.dev
+security:
+  - bearerAuth: []
+paths:
+  /v1/jobs:
+    post:
+      operationId: submitJob
+      summary: Submit an ONYX job
+      description: Submit a supported job type to the ONYX CONNECT worker queue.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - type
+              properties:
+                type:
+                  type: string
+                  description: Supported worker job type, for example device.info.
+      responses:
+        '200':
+          description: Job accepted or returned by the gateway.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobEnvelope'
+        '401':
+          description: Missing or invalid Bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /v1/jobs/{jobId}:
+    get:
+      operationId: getJob
+      summary: Get an ONYX job
+      description: Retrieve the current status and result of a previously submitted job.
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: ID returned by submitJob.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Current job envelope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobEnvelope'
+        '401':
+          description: Missing or invalid Bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Job ID was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    Job:
+      type: object
+      required:
+        - id
+        - type
+        - status
+        - result
+        - error
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+          enum:
+            - pending
+            - done
+            - error
+        result:
+          type:
+            - object
+            - 'null'
+          additionalProperties: true
+        error:
+          type:
+            - string
+            - 'null'
+        created_at:
+          type: string
+          description: ISO 8601 timestamp.
+        updated_at:
+          type: string
+          description: ISO 8601 timestamp.
+    JobEnvelope:
+      type: object
+      required:
+        - ok
+        - job
+      properties:
+        ok:
+          type: boolean
+        job:
+          $ref: '#/components/schemas/Job'
+    ErrorEnvelope:
+      type: object
+      required:
+        - ok
+        - error
+      properties:
+        ok:
+          type: boolean
+        error:
+          type: string
