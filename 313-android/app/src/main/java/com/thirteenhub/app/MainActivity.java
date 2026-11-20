@@ -295,15 +295,13 @@ public class MainActivity extends Activity {
         line.addView(bubble, new LinearLayout.LayoutParams(-2, -2));
         LinearLayout.LayoutParams p = withMargins(-1, -2, 0, dp(5), 0, dp(9));
         messagesBox.addView(line, p);
-        if (!user) {
-            Button copy = button("نسخ", false);
-            copy.setTextSize(11);
-            copy.setOnClickListener(v -> copyText(text));
-            LinearLayout copyLine = new LinearLayout(this);
-            copyLine.setGravity(Gravity.LEFT);
-            copyLine.addView(copy, lp(dp(64), dp(34)));
-            messagesBox.addView(copyLine, withMargins(-1, -2, 0, 0, 0, dp(8)));
-        }
+        Button copy = button("📋 نسخ", false);
+        copy.setTextSize(11);
+        copy.setOnClickListener(v -> copyText(text));
+        LinearLayout copyLine = new LinearLayout(this);
+        copyLine.setGravity(user ? Gravity.RIGHT : Gravity.LEFT);
+        copyLine.addView(copy, lp(dp(82), dp(34)));
+        messagesBox.addView(copyLine, withMargins(-1, -2, 0, 0, 0, dp(8)));
         chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
     }
 
@@ -427,7 +425,7 @@ public class MainActivity extends Activity {
         if (nativeListening && speechRecognizer != null) {
             try { speechRecognizer.stopListening(); } catch (Exception ignored) { }
             nativeListening = false;
-            if (micButton != null) micButton.setText("🎙\\nتسجيل صوتي");
+            if (micButton != null) micButton.setText("🎙\nتسجيل صوتي");
             return;
         }
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
@@ -444,7 +442,7 @@ public class MainActivity extends Activity {
             speechRecognizer.setRecognitionListener(new RecognitionListener() {
                 @Override public void onReadyForSpeech(Bundle params) {
                     nativeListening = true;
-                    if (micButton != null) micButton.setText("⏹\\nإيقاف التسجيل");
+                    if (micButton != null) micButton.setText("⏹\nإيقاف التسجيل");
                 }
                 @Override public void onBeginningOfSpeech() { }
                 @Override public void onRmsChanged(float rmsdB) { }
@@ -452,14 +450,14 @@ public class MainActivity extends Activity {
                 @Override public void onEndOfSpeech() { }
                 @Override public void onError(int error) {
                     nativeListening = false;
-                    if (micButton != null) micButton.setText("🎙\\nتسجيل صوتي");
+                    if (micButton != null) micButton.setText("🎙\nتسجيل صوتي");
                     if (error != SpeechRecognizer.ERROR_NO_MATCH && error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
                         Toast.makeText(MainActivity.this, "تعذر فهم الصوت، حاول مرة أخرى", Toast.LENGTH_SHORT).show();
                     }
                 }
                 @Override public void onResults(Bundle results) {
                     nativeListening = false;
-                    if (micButton != null) micButton.setText("🎙\\nتسجيل صوتي");
+                    if (micButton != null) micButton.setText("🎙\nتسجيل صوتي");
                     ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                     if (matches != null && !matches.isEmpty()) {
                         String current = composer.getText().toString().trim();
@@ -480,7 +478,7 @@ public class MainActivity extends Activity {
             Toast.makeText(this, "تحدث الآن", Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
             nativeListening = false;
-            if (micButton != null) micButton.setText("🎙\\nتسجيل صوتي");
+            if (micButton != null) micButton.setText("🎙\nتسجيل صوتي");
             Toast.makeText(this, "تعذر بدء المايكروفون", Toast.LENGTH_SHORT).show();
         }
     }
@@ -524,7 +522,11 @@ public class MainActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
-        if (speechRecognizer != null) { speechRecognizer.destroy(); speechRecognizer = null; }
+        if (speechRecognizer != null) {
+            try { speechRecognizer.cancel(); } catch (Exception ignored) { }
+            speechRecognizer.destroy();
+            speechRecognizer = null;
+        }
         worker.shutdownNow();
         super.onDestroy();
     }
