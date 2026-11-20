@@ -580,7 +580,7 @@ public class MainActivity extends Activity {
             } else {
                 Toast.makeText(this, "اسمح باستخدام المايكروفون لتفعيل الإملاء الصوتي", Toast.LENGTH_LONG).show();
             }
-         else if (requestCode == 314) {
+        } else if (requestCode == 314) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 toggleElafWakeService();
             } else {
