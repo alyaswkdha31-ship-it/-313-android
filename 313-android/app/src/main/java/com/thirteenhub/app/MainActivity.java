@@ -21,6 +21,7 @@ import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.Intent;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -63,6 +64,7 @@ public class MainActivity extends Activity {
         getWindow().setStatusBarColor(bg);
         getWindow().setNavigationBarColor(bg);
         buildChat();
+        restoreHistory();
         refreshConnectionStatus();
         if (!hasKey()) showKeyDialog(false);
     }
@@ -312,12 +314,73 @@ public class MainActivity extends Activity {
     }
 
     private void refreshConnectionStatus() {
-        boolean configured = hasKey();
-        connectionStatus.setText(configured
-                ? "● رمز ربط Termux محفوظ • المحادثة عبر الموجّه المجاني"
-                : "○ اربط 313 بخدمة Termux من ⚙ لبدء المحادثة");
-        connectionStatus.setTextColor(configured ? Color.rgb(113, 214, 164) : muted);
+        if (!hasKey()) {
+            connectionStatus.setText("○ اربط 313 بخدمة Termux من ⚙ لبدء المحادثة");
+            connectionStatus.setTextColor(muted);
+            return;
+        }
+        connectionStatus.setText("◌ رمز الربط محفوظ • جارٍ فحص خدمة 313...");
+        connectionStatus.setTextColor(muted);
+        worker.execute(() -> {
+            JSONObject diagnostics = null;
+            String failure = null;
+            try {
+                diagnostics = TermuxGatewayApi.diagnostics(TeamGatewayStore.read(this));
+            } catch (Exception e) {
+                failure = e.getMessage();
+            }
+            final JSONObject result = diagnostics;
+            final String error = failure;
+            mainHandler.post(() -> {
+                if (isFinishing() || connectionStatus == null) return;
+                if (result != null && result.optBoolean("ready")) {
+                    connectionStatus.setText("● 313 وGitHub وOmniRoute متصلة • وضع المجاني الصارم مؤكد");
+                    connectionStatus.setTextColor(Color.rgb(113, 214, 164));
+                } else if (result != null) {
+                    connectionStatus.setText("◌ 313 تعمل جزئياً • فحص OmniRoute/Strict يحتاج مراجعة");
+                    connectionStatus.setTextColor(Color.rgb(235, 170, 115));
+                } else {
+                    connectionStatus.setText("○ تعذر فحص خدمة 313: " + safeDetail(error));
+                    connectionStatus.setTextColor(Color.rgb(235, 170, 115));
+                }
+            });
+        });
+    }
 
+    private void restoreHistory() {
+        SharedPreferences prefs = getSharedPreferences("elafyas_chat", MODE_PRIVATE);
+        String saved = prefs.getString("messages", "[]");
+        try {
+            JSONArray restored = new JSONArray(saved);
+            for (int i = 0; i < restored.length(); i++) {
+                JSONObject item = restored.optJSONObject(i);
+                if (item == null) continue;
+                String role = item.optString("role", "");
+                String content = item.optString("content", "");
+                if (!("user".equals(role) || "assistant".equals(role)) || content.trim().isEmpty()) continue;
+                JSONObject clean = new JSONObject();
+                clean.put("role", role);
+                clean.put("content", content);
+                history.put(clean);
+                addBubble(content, "user".equals(role));
+            }
+            trimAndSaveHistory();
+            if (history.length() == 0) addWelcome();
+        } catch (Exception e) {
+            while (history.length() > 0) history.remove(history.length() - 1);
+            prefs.edit().remove("messages").apply();
+            addWelcome();
+        }
+    }
+
+    private void trimAndSaveHistory() {
+        JSONArray trimmed = new JSONArray();
+        int start = Math.max(0, history.length() - 40);
+        for (int i = start; i < history.length(); i++) trimmed.put(history.opt(i));
+        while (history.length() > 0) history.remove(history.length() - 1);
+        for (int i = 0; i < trimmed.length(); i++) history.put(trimmed.opt(i));
+        getSharedPreferences("elafyas_chat", MODE_PRIVATE).edit()
+                .putString("messages", history.toString()).apply();
     }
 
     private void showKeyDialog(boolean allowSkip) {
@@ -373,6 +436,7 @@ public class MainActivity extends Activity {
             user.put("role", "user");
             user.put("content", prompt);
             history.put(user);
+            trimAndSaveHistory();
         } catch (Exception ignored) { }
 
         sending = true;
@@ -399,6 +463,7 @@ public class MainActivity extends Activity {
                         assistant.put("role", "assistant");
                         assistant.put("content", response);
                         history.put(assistant);
+                        trimAndSaveHistory();
                     } catch (Exception ignored) { }
                 } else {
                     addBubble(error == null ? "تعذر تحديد سبب فشل الاتصال." : error, false);
