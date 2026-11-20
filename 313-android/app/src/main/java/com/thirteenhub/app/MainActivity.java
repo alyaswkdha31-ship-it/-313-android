@@ -138,6 +138,7 @@ public class MainActivity extends Activity {
         nav.setBackground(shape(Color.rgb(8, 24, 52), Color.rgb(26, 72, 133)));
         body.addView(nav, lp(dp(78), -1));
         addNavItem(nav, "▣", "المحادثة", () -> chatScroll.fullScroll(View.FOCUS_DOWN), true);
+        addNavItem(nav, "🎙", "يا إيلاف", this::toggleElafWakeService, false);
         addNavItem(nav, "▦", "التحكم", () -> startActivity(new Intent(this, OnyxControlActivity.class)), false);
         addNavItem(nav, "♙", "إدارة 313", () -> startActivity(new Intent(this, TeamConsoleActivity.class)), false);
         addNavItem(nav, "⚙", "الخدمات", () -> showKeyDialog(true), false);
@@ -489,6 +490,26 @@ public class MainActivity extends Activity {
         Toast.makeText(this, "تم النسخ", Toast.LENGTH_SHORT).show();
     }
 
+    private void toggleElafWakeService() {
+        if (ElafWakeService.isRunning()) {
+            stopService(new Intent(this, ElafWakeService.class));
+            Toast.makeText(this, "تم إيقاف الاستماع: يا إيلاف", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (android.os.Build.VERSION.SDK_INT >= 23
+                && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 314);
+            return;
+        }
+        try {
+            Intent service = new Intent(this, ElafWakeService.class);
+            if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(service);
+            else startService(service);
+            Toast.makeText(this, "بدأت خدمة يا إيلاف. اترك إشعارها ظاهراً.", Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "تعذر تشغيل خدمة يا إيلاف: " + safeDetail(e.getMessage()), Toast.LENGTH_LONG).show();
+        }
+    }
     private void startVoiceInput() {
         if (nativeListening && speechRecognizer != null) {
             try { speechRecognizer.stopListening(); } catch (Exception ignored) { }
@@ -558,6 +579,12 @@ public class MainActivity extends Activity {
                 startVoiceInput();
             } else {
                 Toast.makeText(this, "اسمح باستخدام المايكروفون لتفعيل الإملاء الصوتي", Toast.LENGTH_LONG).show();
+            }
+         else if (requestCode == 314) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                toggleElafWakeService();
+            } else {
+                Toast.makeText(this, "يلزم السماح بالميكروفون لتشغيل يا إيلاف", Toast.LENGTH_LONG).show();
             }
         }
     }
