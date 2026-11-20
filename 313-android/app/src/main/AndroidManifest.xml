@@ -2,9 +2,10 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:allowBackup="false"
-        android:label="313"
+        android:label="مركز قيادة إيلاف"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="false">
+        <activity android:name=".OnyxControlActivity" android:exported="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true">
